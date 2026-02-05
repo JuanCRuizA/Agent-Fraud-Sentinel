@@ -1,0 +1,25 @@
+# Python Virtual Environment
+.venv/
+venv/
+env/
+
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Data (ignore contents but keep structure)
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Models
+models/*.pkl
+models/*.joblib
+
+# Environment
+.env
+
+# IDE & Tools
+.vscode/
+.claude/
