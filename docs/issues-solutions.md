@@ -63,3 +63,54 @@ Track technical problems encountered and how they were solved.
 **Prevention:** Always close the notebook tab before requesting external modifications, then reopen after changes are saved.
 
 ---
+
+### [ISSUE-005] ValueError: StandardScaler Input Contains Infinity
+**Date:** 2026-02-08
+**Status:** ✅ Resolved
+**Severity:** 🔴 Critical
+**Problem:** `ValueError: Input X contains infinity or a value too large for dtype('float64')` when fitting StandardScaler in notebook 03.
+**Root Cause:** The `amount_deviation` feature (Z-score) produces infinity when dividing by zero. This occurs for clients with only one transaction (standard deviation = 0).
+**Solution:** Added data cleaning function before scaling:
+- Replace `inf` with +10, `-inf` with -10 (extreme deviation boundaries)
+- Fill `NaN` with 0 (typical for first transactions where deviation is undefined)
+- Added assertions to verify no infinity or NaN remain in features
+**Prevention:** Always validate features for infinity/NaN after computing Z-scores or ratios. Add data quality checks before feeding data to scikit-learn transformers.
+
+---
+
+### [ISSUE-006] NameError: Variables Defined Out of Order
+**Date:** 2026-02-08
+**Status:** ✅ Resolved
+**Severity:** 🟡 Medium
+**Problem:** `NameError: name 'recall_optimal' is not defined` and `NameError: name 'recall_test' is not defined` when running notebook 03 cells sequentially (Run All).
+**Root Cause:** Cells 31 and 33 referenced variables (`recall_optimal`, `precision_optimal`, `recall_test`, etc.) that were defined later in Cell 35. This created a dependency violation when executing cells top-to-bottom.
+**Solution:** Made Cells 31 and 33 self-contained by computing all required metrics at the START of each cell before using them in comparisons. Each cell now calculates its own unconstrained baseline metrics independently.
+**Prevention:** When adding cells that reference metrics, ensure all dependencies are computed within the same cell or in prior cells. Test with "Run All" to verify sequential execution works correctly.
+
+---
+
+### [ISSUE-007] F-string Expression Cannot Include Backslash
+**Date:** 2026-02-08
+**Status:** ✅ Resolved
+**Severity:** 🟢 Low
+**Problem:** `SyntaxError: f-string expression part cannot include a backslash` in Cell 37 when accessing dictionary values inside f-strings.
+**Root Cause:** Python f-strings do not allow backslashes inside the `{}` expression parts. The code `f"{threshold_config[\"manual_review_threshold\"]:.3f}"` used escaped quotes (backslashes) inside the f-string expression.
+**Solution:** Compute the dictionary value outside the f-string first, then reference the variable:
+```python
+manual_threshold = threshold_config["manual_review_threshold"]
+print(f"Manual review threshold: >= {manual_threshold:.3f}")
+```
+**Prevention:** Extract complex expressions (dictionary access, string operations) into variables before using them in f-strings. This improves both readability and avoids syntax limitations.
+
+---
+
+### [ISSUE-008] Confusion About Model Performance at Different Thresholds
+**Date:** 2026-02-08
+**Status:** ✅ Resolved
+**Severity:** 🟡 Medium
+**Problem:** User confused why baseline model showed 42.79% recall at threshold 0.5, XGBoost initial showed 61.05%, but "final" XGBoost only showed 14.42% recall at threshold 0.740.
+**Root Cause:** Comparing models at different thresholds (0.5 vs 0.740) is misleading — it conflates two separate decisions: (1) which model is best, and (2) what threshold to use.
+**Solution:** Added Cell 26 (markdown explanation of "TWO SEPARATE STEPS") and Cell 28 (fair comparison showing all models at threshold 0.5). Clearly separated model selection (use PR-AUC) from threshold optimization (use cost analysis).
+**Prevention:** Always compare models at the same threshold first. Document that threshold selection is a separate business decision applied AFTER choosing the best model.
+
+---

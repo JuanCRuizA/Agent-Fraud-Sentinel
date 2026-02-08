@@ -14,6 +14,9 @@ Document key technical decisions, rationale, and alternatives considered during 
 - [DECISION-004] Leakage-Free Feature Engineering
 - [DECISION-005] Temporal Train/Val/Test Split
 - [DECISION-006] Asymmetric Cost Assumptions
+- [DECISION-007] XGBoost Over Logistic Regression
+- [DECISION-008] Constrained Optimization with 75% Minimum Recall
+- [DECISION-009] Multi-Threshold Production Strategy
 
 ### Pending Review
 - None
@@ -175,6 +178,89 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Threshold tuning will optimize for minimum total cost, not just classification accuracy
 - Stakeholder presentations can frame model value in dollar terms
 **Related:** `notebooks/exploratory/01_eda_fraud_patterns.ipynb` (Section 10)
+
+---
+
+### [DECISION-007] XGBoost Over Logistic Regression for Production Model
+**Date:** 2026-02-08
+**Status:** ✅ Implemented
+**Context:** Need to select the best-performing model for production deployment. Baseline (Logistic Regression) provides interpretability, but may lack predictive power for complex fraud patterns.
+**Decision:** Deploy XGBoost as the production model after hyperparameter tuning.
+**Rationale:**
+- **PR-AUC improvement**: XGBoost (0.1098) outperforms Logistic Regression (0.0821) by 33.8%
+- **Fair comparison at threshold 0.5**: XGBoost catches 60.9% of fraud vs 42.8% baseline
+- **Non-linear patterns**: Fraud detection involves complex interactions that tree-based models capture better
+- **Feature importance**: XGBoost provides interpretable tree-based importance metrics
+- **Industry standard**: XGBoost is widely used in production fraud detection systems
+- **Class imbalance handling**: Built-in `scale_pos_weight` parameter (set to 28.56 for 3.5% fraud rate)
+**Alternatives Considered:**
+- Logistic Regression: Simpler and more interpretable, but lower PR-AUC (0.0821)
+- Random Forest: Similar to XGBoost but typically slower and less performant
+- LightGBM/CatBoost: Could be explored in future iterations for potential speed/performance gains
+- Neural Networks: Overkill for 7 features, harder to interpret, requires more data
+**Consequences:**
+- Best hyperparameters: max_depth=6, n_estimators=200, learning_rate=0.05 (from grid search)
+- Model file size: ~500KB (xgboost_final.pkl) — small enough for real-time deployment
+- Training time: ~30 seconds on full dataset (acceptable for retraining cadence)
+- Inference time: <1ms per transaction (meets real-time requirement)
+- Trade-off: Less interpretable than Logistic Regression but significantly better performance
+**Related:** `notebooks/modeling/03_model_training.ipynb` (Sections 3-5)
+
+---
+
+### [DECISION-008] Constrained Optimization with 75% Minimum Recall Over Pure Cost Minimization
+**Date:** 2026-02-08
+**Status:** ✅ Implemented
+**Context:** Unconstrained cost optimization found threshold 0.740 with lowest total cost ($328K), but this only catches 14.4% of fraud (665 of 4,611 frauds). Real banks prioritize fraud detection over pure cost minimization.
+**Decision:** Implement constrained optimization requiring minimum 75% recall, resulting in threshold 0.410.
+**Rationale:**
+- **Business reality**: Banks cannot tolerate catching only 14% of fraud, even if it minimizes immediate operational cost
+- **Regulatory compliance**: Financial institutions face penalties for inadequate fraud prevention
+- **Customer trust**: Missing 86% of fraud transactions damages brand reputation and customer confidence
+- **Long-term cost**: Reputational damage and regulatory fines exceed short-term operational savings
+- **75% target**: Realistic balance between catching most fraud (76% actual) while controlling false positive costs
+**Alternatives Considered:**
+1. **Unconstrained optimization (threshold 0.740)**: 14.4% recall, $328K cost — rejected as unacceptable
+2. **Higher recall targets (85-90%)**: Would require threshold ~0.25-0.30, causing FP explosion (100K+ false alarms)
+3. **Fixed threshold (0.5)**: Arbitrary choice, doesn't account for business costs (60.9% recall, moderate cost)
+**Consequences:**
+- **Threshold shifts**: From 0.740 (unconstrained) to 0.410 (constrained 75%)
+- **Recall improvement**: 14.4% → 76.0% (catches 2,840 additional frauds on validation set)
+- **Cost increase**: $328K → $598K (82% increase, or +$270K)
+- **Cost per additional fraud caught**: $94.99 (vs $75 median fraud amount — slightly negative ROI on cost alone)
+- **Trade-off justified**: Preventing $213K in fraud losses (2,840 frauds × $75) costs $270K, but includes intangible benefits (reputation, compliance)
+- **False positives**: 3,248 → 51,524 (15.8x increase, significant analyst workload)
+**Related:** `notebooks/modeling/03_model_training.ipynb` (Cell 31)
+
+---
+
+### [DECISION-009] Multi-Threshold Production Strategy Over Single Threshold
+**Date:** 2026-02-08
+**Status:** ✅ Implemented
+**Context:** Single threshold (0.410) achieves 75% recall but generates 51,524 manual reviews on validation set (46.6% of all transactions). This is operationally expensive and treats all flagged transactions equally, ignoring confidence levels.
+**Decision:** Implement three-tier strategy:
+- **Auto-block (score ≥ 0.90)**: Instant fraud block, $5 cost (automated processing)
+- **Manual review (0.410 ≤ score < 0.90)**: Human analyst review, $10 cost
+- **Auto-approve (score < 0.410)**: No review, $0 cost
+**Rationale:**
+- **Confidence-based triage**: High-confidence fraud (≥0.90) doesn't need human review
+- **Operational efficiency**: Reduces per-transaction cost for obvious fraud cases ($5 vs $10)
+- **Same recall target**: Maintains 76% recall (3,505 frauds caught on validation set)
+- **Faster fraud blocking**: Auto-block enables instant rejection for score ≥0.90 (no analyst queue)
+- **Realistic banking practice**: Real fraud systems use tiered decision rules, not binary threshold
+**Alternatives Considered:**
+- Single threshold (0.410): 76% recall but all 55,029 flagged txns require manual review
+- Four-tier strategy: Adding "auto-approve-with-monitoring" tier (0.30-0.41) adds complexity without clear benefit
+- Adaptive thresholds: Dynamic adjustment based on fraud rate trends (future enhancement)
+**Consequences:**
+- **Auto-block segment**: 19 transactions (0.02%), 6 frauds caught, 13 false positives, $65 cost
+- **Manual review segment**: 55,010 transactions (46.6%), 3,499 frauds caught, 51,511 FPs, $515K cost
+- **Auto-approve segment**: 63,079 transactions (53.4%), 1,106 frauds missed, $83K FN cost
+- **Total cost**: $598K (same as single threshold, slight savings from $5 auto-block)
+- **Efficiency gain**: Minimal cost reduction but enables faster blocking of high-confidence fraud
+- **Test set validation**: 76% recall confirmed, production strategy is robust
+- **Configuration saved**: `threshold_config.pkl` contains all parameters for deployment
+**Related:** `notebooks/modeling/03_model_training.ipynb` (Cells 32-33, 37)
 
 ---
 
