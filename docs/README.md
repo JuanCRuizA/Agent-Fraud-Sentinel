@@ -1,11 +1,29 @@
 # Documentation Index
 
+## 📊 Project Status
+
+| Phase | Notebook | Status |
+|-------|----------|--------|
+| Phase 1 - EDA | `01_eda_fraud_patterns.ipynb` | ✅ Completed |
+| Phase 2 - Feature Engineering | `02_feature_engineering.ipynb` | ✅ Completed |
+| Phase 3 - Modeling | `03_modeling.ipynb` | 🔲 Next |
+| Phase 4 - Agent & Dashboard | TBD | 🔲 Planned |
+
+**Key Metrics Discovered:**
+- 590,540 transactions | 3.50% fraud rate | 1:27 class imbalance
+- 7 engineered features across 4 tiers (all with confirmed fraud signal)
+- Cost ratio: 7.5:1 (FN=$75 missed fraud vs FP=$10 manual review)
+- Temporal train/val/test split (60/20/20) saved to `data/processed/`
+
+---
+
 ## 📚 Documentation Files
 
 ### [notebooks-progress.md](./notebooks-progress.md)
 Track development progress for each Jupyter notebook. Includes:
-- Notebook structure and sections
-- Key outputs and visualizations
+- Notebook structure, sections, and cell counts
+- Key findings and statistical results
+- Visualizations produced
 - Next steps and TODOs
 
 ### [technical-decisions.md](./technical-decisions.md)
@@ -13,14 +31,13 @@ Record important technical decisions with:
 - Context and rationale
 - Alternatives considered
 - Consequences and trade-offs
-- Status tracking
+- 6 decisions documented (dataset, EDA, client_id, leakage prevention, temporal split, cost assumptions)
 
 ### [issues-solutions.md](./issues-solutions.md)
 Log problems and solutions:
-- Technical issues encountered
-- Root cause analysis
-- Solutions implemented
-- Prevention strategies
+- 4 real issues documented and resolved
+- Root cause analysis for each
+- Prevention strategies for the future
 
 ---
 
@@ -45,8 +62,7 @@ Log problems and solutions:
 
 ## 🎯 Benefits
 
-✅ Both PCs stay in sync  
-✅ Never lose context when switching  
-✅ Portfolio documentation  
-✅ Interview talking points  
+✅ Never lose context when switching
+✅ Portfolio documentation
+✅ Interview talking points
 ✅ Future reference for similar projects
