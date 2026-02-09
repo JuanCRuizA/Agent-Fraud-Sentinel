@@ -65,7 +65,7 @@ except NameError:
     BASE_PATH = Path.cwd()
 
 MODEL_PATH = BASE_PATH / '..' / '..' / 'models'
-DATA_PATH = BASE_PATH / '..' / '..' / 'data' / 'processed'
+DATA_PATH = BASE_PATH  # slim test data lives alongside the app
 FIGURES_PATH = BASE_PATH / '..' / '..' / 'figures' / 'shap'
 
 
@@ -84,7 +84,11 @@ def load_model_artifacts():
 @st.cache_data
 def load_test_data():
     """Load the held-out test set (most recent transactions)."""
-    return pd.read_csv(DATA_PATH / 'test.csv')
+    # Try slim dashboard file first, fall back to full test set
+    slim = DATA_PATH / 'test_dashboard.csv'
+    full = BASE_PATH / '..' / '..' / 'data' / 'processed' / 'test.csv'
+    path = slim if slim.exists() else full
+    return pd.read_csv(path)
 
 
 @st.cache_data

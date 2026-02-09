@@ -13,8 +13,8 @@ data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
-# Models
-models/*.pkl
+# Models (allow pkl for Streamlit Cloud deployment)
+# models/*.pkl
 models/*.joblib
 
 # Environment
