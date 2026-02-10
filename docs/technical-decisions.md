@@ -17,6 +17,10 @@ Document key technical decisions, rationale, and alternatives considered during 
 - [DECISION-007] XGBoost Over Logistic Regression
 - [DECISION-008] Constrained Optimization with 75% Minimum Recall
 - [DECISION-009] Multi-Threshold Production Strategy
+- [DECISION-010] SHAP TreeExplainer for Model Explainability
+- [DECISION-011] Six Representative Case Studies for Local Explainability
+- [DECISION-012] Sidebar Radio Navigation Over st.tabs() for Dashboard
+- [DECISION-013] Slim Test Data for Streamlit Cloud Deployment
 
 ### Pending Review
 - None
@@ -261,6 +265,110 @@ Document key technical decisions, rationale, and alternatives considered during 
 - **Test set validation**: 76% recall confirmed, production strategy is robust
 - **Configuration saved**: `threshold_config.pkl` contains all parameters for deployment
 **Related:** `notebooks/modeling/03_model_training.ipynb` (Cells 32-33, 37)
+
+---
+
+### [DECISION-010] SHAP TreeExplainer for Model Explainability
+**Date:** 2026-02-09
+**Status:** ✅ Implemented
+**Context:** Regulators (SR 11-7), customers (right-to-explanation), and fraud analysts all need to understand *why* the model flags transactions. A "black box" model is not deployable in banking.
+**Decision:** Use SHAP TreeExplainer to produce exact Shapley values for every prediction, providing both global feature importance and local (per-transaction) explanations.
+**Rationale:**
+- **Exact values**: TreeExplainer computes exact Shapley values for tree-based models (no approximation)
+- **Speed**: Polynomial-time algorithm handles the full 118K test set in seconds with 7 features
+- **Theory-grounded**: Game-theoretic foundation (Shapley values) provides mathematically rigorous attribution
+- **Regulatory acceptance**: SHAP is the industry standard for model explainability in banking
+- **Dual-purpose**: Global plots (beeswarm, bar) serve stakeholders; local plots (waterfall) serve analysts and auditors
+**Alternatives Considered:**
+- LIME (Local Interpretable Model-agnostic Explanations): Approximation-based, less reliable for tree models, slower per-instance
+- XGBoost built-in `feature_importances_`: Only provides global importance (gain/weight), no local explanations
+- Partial Dependence Plots: Show marginal effects but don't explain individual predictions
+- Custom rule extraction: Fragile, doesn't scale, not theory-grounded
+**Consequences:**
+- SHAP values computed for 2,000-sample subset (global analysis) and full 118K test set (local analysis)
+- 6 publication-ready figures saved to `figures/shap/`
+- Base value (expected model output) = 0.0178, meaning the model starts at ~1.8% fraud probability before seeing any features
+- Each feature pushes the score up or down from this baseline, enabling clear "waterfall" explanations
+- SHAP values should be stored at scoring time in production for audit trail (7-year retention)
+**Related:** `notebooks/modeling/04_shap_explainability.ipynb` (Sections 2-3)
+
+---
+
+### [DECISION-011] Six Representative Case Studies for Local Explainability
+**Date:** 2026-02-09
+**Status:** ✅ Implemented
+**Context:** Global SHAP plots show overall patterns, but regulators and analysts need to see how the model explains *individual* transactions. Case studies must cover all possible model outcomes to demonstrate comprehensive explainability.
+**Decision:** Select 6 representative case studies covering the full spectrum of model decisions:
+1. **True Positive (clear)** — high score, actual fraud (auto-block)
+2. **True Positive (velocity-driven)** — moderate score, fraud detected through velocity signals
+3. **False Negative (missed)** — low score, actual fraud that the model failed to catch
+4. **False Positive (false alarm)** — high score on a legitimate transaction
+5. **Auto-block candidate** — score >= 0.90, demonstrating the auto-block tier
+6. **Borderline** — score near the manual review threshold (0.41)
+**Rationale:**
+- Covers all 4 confusion matrix quadrants (TP, FP, FN, TN-adjacent)
+- Demonstrates model strengths (Cases 1-2) AND limitations (Case 3)
+- Shows the cost of false alarms (Case 4) and the auto-block tier in action (Case 5)
+- Borderline case (Case 6) illustrates threshold sensitivity for threshold-tuning discussions
+- Each case includes plain-English explanation suitable for customer disputes
+**Alternatives Considered:**
+- Random sample of transactions: Would not guarantee coverage of all outcome types
+- Only positive examples (TP): Would hide model limitations from regulators
+- Customer-facing examples only: Would miss internal operational insights
+**Consequences:**
+- Cases 4 and 5 happen to be the same transaction (score 0.9342, legitimate) — this was not engineered but reflects the data reality that very few transactions score above 0.90
+- Case 3 (missed fraud, score 0.0853) reveals the model's primary weakness: fraudsters with zero velocity and normal amounts evade detection
+- All 6 cases documented with transaction features, SHAP waterfall plots, and risk driver bullet points
+- Reused in Phase 5 dashboard (Tab 3: Case Study Explorer)
+**Related:** `notebooks/modeling/04_shap_explainability.ipynb` (Cells 16-22), `notebooks/dashboard/dashboard_app.py` (Case Study Explorer tab)
+
+---
+
+### [DECISION-012] Sidebar Radio Navigation Over st.tabs() for Dashboard
+**Date:** 2026-02-09
+**Status:** ✅ Implemented
+**Context:** The Streamlit dashboard needs clear navigation across 4 content areas (Executive Summary, Model Performance, Case Study Explorer, Regulatory Compliance). Streamlit offers both `st.tabs()` and `st.sidebar.radio()` as navigation patterns.
+**Decision:** Use `st.sidebar.radio()` for page navigation, with each page rendered conditionally in the main area.
+**Rationale:**
+- **Persistent controls**: Sidebar keeps global filters (threshold slider, sample size) always visible regardless of which page is active
+- **Professional banking aesthetic**: Sidebar navigation is standard in enterprise dashboards
+- **Branding space**: Sidebar provides dedicated space for "BAFS" branding, About & Methods expander
+- **Footer consistency**: Each page can independently render the complete footer at its bottom
+- **Clean URL**: Radio navigation doesn't add tab state to the URL, keeping the app URL clean
+**Alternatives Considered:**
+- `st.tabs()` in main area: Tabs collapse on narrow screens (mobile), lose sidebar filter context
+- Combined (sidebar radio + tabs): Redundant navigation, confusing UX
+- Multi-page app (`pages/` directory): More complex file structure, harder to maintain for a portfolio prototype
+**Consequences:**
+- Footer must be explicitly called in each page branch (`render_footer()` at end of each `if/elif`)
+- Only one page renders at a time (saves computation vs tabs which may pre-render)
+- Sidebar space is efficiently used: branding + navigation + filters + about, all in one column
+**Related:** `notebooks/dashboard/dashboard_app.py`
+
+---
+
+### [DECISION-013] Slim Test Data for Streamlit Cloud Deployment
+**Date:** 2026-02-10
+**Status:** ✅ Implemented
+**Context:** The dashboard needs test data to compute live predictions. The full `test.csv` (145 MB, 442 columns) exceeds GitHub's 100 MB file size limit, making it impossible to commit for Streamlit Cloud deployment.
+**Decision:** Create `test_dashboard.csv` containing only the 8 columns needed by the dashboard (7 model features + isFraud), reducing file size from 145 MB to 4.2 MB. The app loads this slim file first, falling back to the full `test.csv` for local development.
+**Rationale:**
+- **97% size reduction**: 145 MB to 4.2 MB by removing 434 unused columns
+- **No data loss**: All 118,108 rows preserved; only unnecessary columns removed
+- **GitHub compatible**: 4.2 MB is well within GitHub's 100 MB limit
+- **Graceful fallback**: `dashboard_app.py` tries slim file first, falls back to full test set
+- **Separation of concerns**: Dashboard data file is independent of the full analysis dataset
+**Alternatives Considered:**
+- Git LFS (Large File Storage): Adds complexity, requires LFS quota, not supported by Streamlit Cloud free tier
+- Cloud storage (S3, GCS): Adds infrastructure dependency and credentials management
+- Parquet format: Would reduce full CSV from 145 MB to ~30-40 MB, but still exceeds 100 MB limit with all columns
+- Subsample rows: Would reduce statistical validity; keeping all rows with fewer columns is better
+**Consequences:**
+- Model pkl files (< 1 MB total) are now also tracked in git (`.gitignore` updated)
+- Dashboard loads in ~2 seconds on Streamlit Cloud (vs potentially 10+ seconds with full CSV)
+- Local development can still use full `test.csv` if available (richer data for debugging)
+- Pattern is reusable: any future dashboard can create slim data extracts for deployment
+**Related:** `notebooks/dashboard/dashboard_app.py` (load_test_data function), `.gitignore`
 
 ---
 

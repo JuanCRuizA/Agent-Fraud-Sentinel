@@ -114,3 +114,39 @@ print(f"Manual review threshold: >= {manual_threshold:.3f}")
 **Prevention:** Always compare models at the same threshold first. Document that threshold selection is a separate business decision applied AFTER choosing the best model.
 
 ---
+
+### [ISSUE-009] Streamlit `use_container_width` Deprecation Warning
+**Date:** 2026-02-09
+**Status:** ✅ Resolved
+**Severity:** 🟢 Low
+**Problem:** When running the Streamlit dashboard locally, the terminal showed: `use_container_width will be removed after 2025-12-31. For use_container_width=True, use width='stretch'`.
+**Root Cause:** Streamlit deprecated the `use_container_width` parameter in `st.image()` and `st.dataframe()` in favor of the new `width` parameter. The dashboard code used the older API.
+**Solution:** Replaced all 5 occurrences of `use_container_width=True` with `width="stretch"` in `dashboard_app.py`.
+**Prevention:** Check Streamlit release notes for deprecated parameters when upgrading. Use the latest parameter names from the Streamlit documentation.
+
+---
+
+### [ISSUE-010] Streamlit Cloud FileNotFoundError for Model Artifacts
+**Date:** 2026-02-10
+**Status:** ✅ Resolved
+**Severity:** 🔴 Critical
+**Problem:** After deploying to Streamlit Cloud, the app showed: `Failed to load model or data: [Errno 2] No such file or directory: '/mount/src/agent-fraud-sentinel/notebooks/dashboard/../../models/xgboost_final.pkl'`
+**Root Cause:** The `.gitignore` file excluded `models/*.pkl` and `data/processed/*`. These files existed locally but were never committed to GitHub, so Streamlit Cloud could not find them.
+**Solution:**
+1. Commented out `models/*.pkl` in `.gitignore` to allow model files (< 1 MB total) to be tracked
+2. Created a slim `test_dashboard.csv` (4.2 MB, 8 columns only) instead of committing the full `test.csv` (145 MB, 442 columns) which exceeded GitHub's 100 MB file limit
+3. Updated `dashboard_app.py` to load `test_dashboard.csv` first, falling back to `test.csv` for local development
+**Prevention:** When building Streamlit Cloud apps, ensure all required data and model files are committed to the repository. For large files, create slim versions with only the columns needed by the dashboard. Check `.gitignore` rules before deployment.
+
+---
+
+### [ISSUE-011] Test CSV Exceeds GitHub 100 MB File Size Limit
+**Date:** 2026-02-10
+**Status:** ✅ Resolved
+**Severity:** 🟡 Medium
+**Problem:** The full `data/processed/test.csv` (145 MB, 118,108 rows x 442 columns) exceeded GitHub's 100 MB per-file limit and could not be committed.
+**Root Cause:** The test CSV contained all 442 original + engineered columns, but the dashboard only uses 8 columns (7 features + isFraud). The remaining 434 columns added ~141 MB of unnecessary data.
+**Solution:** Created `notebooks/dashboard/test_dashboard.csv` containing only the 8 columns needed by the dashboard. This reduced file size from 145 MB to 4.2 MB (97% reduction). The dashboard app tries the slim file first, then falls back to the full test set if available locally.
+**Prevention:** For deployment artifacts, always create minimal data files with only the columns required by the application. Keep full datasets in `.gitignore` and commit only slim versions.
+
+---

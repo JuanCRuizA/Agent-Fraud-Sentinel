@@ -227,14 +227,189 @@
 - [x] Confusion matrices visualized (numbers + percentages)
 
 ### Next Steps
-- [ ] Phase 4: SHAP explainability analysis (`04_shap_explainability.ipynb`)
-  - Global feature importance (which features drive fraud detection?)
-  - Local explanations for high-risk transactions (why was transaction X flagged?)
-  - Waterfall plots for individual predictions
-- [ ] Deployment considerations:
-  - Real-time scoring API (<100ms latency)
-  - A/B testing framework vs current production model
-  - Model drift monitoring dashboard
-  - Fallback to rule-based system if model fails
+- [x] Phase 4: SHAP explainability analysis (completed)
+- [x] Phase 5: Streamlit dashboard (completed)
+
+---
+
+## 04_shap_explainability.ipynb
+
+**Date:** 2026-02-09
+**Status:** Completed (38 cells)
+**Location:** `notebooks/modeling/04_shap_explainability.ipynb`
+**Objective:** Explain XGBoost fraud predictions so fraud analysts, business stakeholders, and regulators understand *why* the model flags or approves each transaction.
+
+### Focus Areas
+- Global feature importance (SHAP summary and bar charts)
+- Local transaction-level explanations (waterfall plots, plain English)
+- Business insights for fraud operations
+- Regulatory compliance documentation (SR 11-7, fair lending, right-to-explanation)
+
+### Notebook Structure
+
+| Section | Content |
+|---------|---------|
+| 1. Setup & Model Loading | Load XGBoost, scaler, threshold config from Phase 3 |
+| 2. Global Explainability | SHAP TreeExplainer on 2,000-sample subset |
+| 2.1 Summary Plot | Beeswarm showing per-feature, per-transaction impact |
+| 2.2 Feature Importance Bar | Mean |SHAP| ranked bar chart |
+| 2.3 Dependence Plots | Top 4 features: value vs SHAP contribution |
+| 2.4 Global Insights | Plain-English summary for fraud analysts |
+| 3. Local Explainability | SHAP values computed for full test set (118,108 txns) |
+| Case Study Selection | 6 representative transactions selected by score and outcome |
+| Plain-English Explanations | `explain_transaction()` helper generates analyst-friendly text |
+| 3.1 Waterfall Plots | 3x2 grid of waterfall plots for all 6 cases |
+| 4. Business Insights | Fraud vs legitimate SHAP comparison + risk tier decomposition |
+| Actionable Insights | 5 operational recommendations for fraud teams |
+| 5. Regulatory Compliance | SR 11-7 documentation, fair lending review, audit trail |
+| 5.1 Model Documentation | Full model card (inputs, outputs, assumptions, performance) |
+| 5.2 Fair Lending | Feature-by-feature protected attribute assessment |
+| 5.3 Right to Explanation | Explainability mandate, dispute resolution workflow |
+| 5.4 Governance Summary | Checklist (8 done, 5 pending), monitoring schedule |
+
+### Visualizations (6 total, saved to `figures/shap/`)
+
+| File | Description |
+|------|-------------|
+| `shap_summary_beeswarm.png` | Overall feature impact (each dot = 1 transaction) |
+| `shap_feature_importance_bar.png` | Ranked mean |SHAP| bar chart |
+| `shap_dependence_top4.png` | Dependence plots for top 4 features |
+| `shap_waterfall_cases.png` | Waterfall plots for 6 case studies (3x2 grid) |
+| `shap_fraud_vs_legit.png` | Grouped bar: fraud vs legitimate SHAP comparison |
+| `shap_risk_tiers.png` | Feature contribution by risk tier (auto-approve / review / block) |
+
+### 6 Case Studies
+
+| Case | Type | Score | Actual | Key Insight |
+|------|------|-------|--------|-------------|
+| 1 | True Positive (clear) | 0.9094 | Fraud | Multiple strong indicators, auto-blocked |
+| 2 | True Positive (velocity) | 0.7332 | Fraud | Velocity features drove detection |
+| 3 | False Negative | 0.0853 | Fraud | All features appeared normal — model limitation |
+| 4 | False Positive | 0.9342 | Legit | Card-testing pattern on legitimate purchase |
+| 5 | Auto-Block candidate | 0.9342 | Legit | High-confidence false alarm |
+| 6 | Borderline | 0.3648 | Legit | Near threshold, demonstrates sensitivity |
+
+### Key Findings
+- **Transaction amount** and **24-hour velocity** are the strongest fraud signals (highest mean |SHAP|)
+- **Spending anomaly score** and **time of day** provide strong secondary signals
+- **First-time transactions** carry higher uncertainty but lower overall importance
+- High-value SHAP contributions are concentrated in velocity + amount features for auto-block tier
+- Missed frauds (FN) consistently show zero velocity and normal amounts — model limitation
+
+### Regulatory Documentation Completed
+- [x] SR 11-7 model documentation (purpose, inputs, outputs, assumptions, limitations)
+- [x] Fair lending feature review (5 features assessed, risk levels assigned)
+- [x] Right-to-explanation capability demonstrated (SHAP waterfall + plain English)
+- [x] Audit trail requirements specified (7-year retention, per-transaction SHAP logging)
+- [x] Model governance checklist (8/13 items complete, 5 pending for production)
+- [x] Monitoring schedule (daily/weekly/monthly/quarterly/annual cadence)
+
+### Next Steps
+- [x] Phase 5: Streamlit dashboard (completed)
+
+---
+
+## 05_streamlit_dashboard.ipynb
+
+**Date:** 2026-02-09 (updated 2026-02-10)
+**Status:** Completed (17 cells) + deployed to Streamlit Cloud
+**Location:** `notebooks/dashboard/05_streamlit_dashboard.ipynb`
+**Objective:** Build a professional, interactive dashboard for fraud detection analytics, model explainability, and regulatory compliance — targeting a Data Scientist portfolio for banking roles.
+
+### Dashboard Architecture
+
+```
++------------------+---------------------------------------------+
+| SIDEBAR          | MAIN AREA                                   |
+|                  |                                             |
+| BAFS             | [Tab 1] Executive Summary                   |
+| Banking Anti-    |   - KPI cards, risk distribution, costs     |
+| Fraud System     |                                             |
+|                  | [Tab 2] Model Performance                   |
+| Navigation       |   - Confusion matrix, ROC, PR, importance   |
+| (radio buttons)  |                                             |
+|                  | [Tab 3] Case Study Explorer                 |
+| Global Filters   |   - 6 cases with SHAP + explanations        |
+| (threshold,      |                                             |
+|  sample size)    | [Tab 4] Regulatory Compliance               |
+|                  |   - SR 11-7, fair lending, audit trail      |
+| About & Methods  |                                             |
+| (expandable)     | [FOOTER on every tab]                       |
++------------------+---------------------------------------------+
+```
+
+### Notebook Structure
+
+| Section | Content |
+|---------|---------|
+| 1. Setup & Dependencies | Verify packages and model artifacts exist |
+| 2. Dashboard Architecture | Layout diagram, file dependencies, design principles |
+| 3. Streamlit Application | `%%writefile dashboard_app.py` — complete app (~600 lines) |
+| 4. Tab Design Documentation | Design rationale for all 4 tabs (Markdown) |
+| 5. Deployment | `requirements.txt`, local run instructions, Streamlit Cloud notes |
+| Summary | Features table, interactive controls, production readiness checklist |
+
+### Tab Content
+
+**Tab 1 — Executive Summary:**
+- 4 KPI cards: Fraud Detected, FPR, Fraud Prevented ($), Total Cost
+- Performance table (recall, precision, F1, FPR, threshold)
+- Risk score distribution histogram (fraud vs legitimate with threshold line)
+- Cost analysis: missed fraud cost, false alarm cost, savings vs no-model baseline
+
+**Tab 2 — Model Performance:**
+- Confusion matrix with cost overlay ($75 FN, $10 FP)
+- ROC curve with operating point at current threshold
+- Precision-Recall curve with baseline and operating point
+- Feature importance (SHAP bar chart from Phase 4, or fallback to model importances)
+- Cost-benefit analysis table across 8 threshold values
+
+**Tab 3 — Case Study Explorer:**
+- Dropdown to select from 6 case studies (from Phase 4 analysis)
+- Transaction features in human-readable format
+- SHAP waterfall plot (loaded from `figures/shap/shap_waterfall_cases.png`)
+- Plain-English model decision explanation
+- Key risk drivers as bullet points
+- Recommended improvements (for missed fraud cases)
+
+**Tab 4 — Regulatory Compliance:**
+- SR 11-7 checklist (8 completed, 4 pending) with checkboxes
+- Fair lending considerations table (5 features assessed)
+- Model governance framework (identification, risk classification, monitoring schedule)
+- Right-to-explanation capabilities and dispute resolution workflow
+- Data lineage and audit trail documentation
+
+### Interactive Controls
+
+| Control | Location | Effect |
+|---------|----------|--------|
+| Risk Threshold slider | Sidebar | Updates all metrics, confusion matrix, and cost analysis |
+| Sample Size selector | Sidebar | Subsamples test data for faster exploration |
+| Case Study dropdown | Tab 3 | Selects individual transaction for detailed analysis |
+
+### Artifacts Produced
+
+| File | Description |
+|------|-------------|
+| `notebooks/dashboard/dashboard_app.py` | Standalone Streamlit application (~600 lines) |
+| `notebooks/dashboard/requirements.txt` | Python dependencies for deployment |
+| `notebooks/dashboard/test_dashboard.csv` | Slim test data (8 columns, 4.2 MB) for Streamlit Cloud |
+
+### Deployment
+- **Local:** `cd notebooks/dashboard && streamlit run dashboard_app.py`
+- **Cloud:** Deployed at `bankingantifraudsystem.streamlit.app`
+- **Repository:** `JuanCRuizA/Agent-Fraud-Sentinel` (main branch)
+
+### Design Principles
+- Professional banking aesthetic (blues, grays, no emojis in main content)
+- Custom CSS for banking color scheme
+- `@st.cache_resource` for model, `@st.cache_data` for data and predictions
+- Reusable `render_footer()` function called at the bottom of every tab
+- All metrics use actual model outputs (no placeholder data)
+
+### Issues Encountered & Resolved
+- [ISSUE-009] `use_container_width` deprecation warning — replaced with `width="stretch"`
+- [ISSUE-010] Streamlit Cloud FileNotFoundError — model and data files excluded by `.gitignore`
+- [ISSUE-011] Test CSV too large for GitHub (145 MB) — created slim 4.2 MB version
 
 ---
