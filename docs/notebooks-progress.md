@@ -235,7 +235,7 @@
 ## 04_shap_explainability.ipynb
 
 **Date:** 2026-02-09
-**Status:** Completed (38 cells)
+**Status:** ✅ Completed (38 cells)
 **Location:** `notebooks/modeling/04_shap_explainability.ipynb`
 **Objective:** Explain XGBoost fraud predictions so fraud analysts, business stakeholders, and regulators understand *why* the model flags or approves each transaction.
 
@@ -312,7 +312,7 @@
 ## 05_streamlit_dashboard.ipynb
 
 **Date:** 2026-02-09 (updated 2026-02-10)
-**Status:** Completed (17 cells) + deployed to Streamlit Cloud
+**Status:** ✅ Completed (17 cells) + deployed to Streamlit Cloud
 **Location:** `notebooks/dashboard/05_streamlit_dashboard.ipynb`
 **Objective:** Build a professional, interactive dashboard for fraud detection analytics, model explainability, and regulatory compliance — targeting a Data Scientist portfolio for banking roles.
 
