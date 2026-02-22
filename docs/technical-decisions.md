@@ -14,13 +14,15 @@ Document key technical decisions, rationale, and alternatives considered during 
 - [DECISION-004] Leakage-Free Feature Engineering
 - [DECISION-005] Temporal Train/Val/Test Split
 - [DECISION-006] Asymmetric Cost Assumptions
-- [DECISION-007] XGBoost Over Logistic Regression
+- [DECISION-007] LightGBM (Bayesian) as Production Model (updated 2026-02-19)
 - [DECISION-008] Constrained Optimization with 75% Minimum Recall
 - [DECISION-009] Multi-Threshold Production Strategy
 - [DECISION-010] SHAP TreeExplainer for Model Explainability
 - [DECISION-011] Six Representative Case Studies for Local Explainability
 - [DECISION-012] Sidebar Radio Navigation Over st.tabs() for Dashboard
 - [DECISION-013] Slim Test Data for Streamlit Cloud Deployment
+- [DECISION-014] Bayesian Optimization (Optuna) Over Grid Search
+- [DECISION-015] LightGBM as Third Model for Gradient Boosting Comparison
 
 ### Pending Review
 - None
@@ -208,7 +210,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Training time: ~30 seconds on full dataset (acceptable for retraining cadence)
 - Inference time: <1ms per transaction (meets real-time requirement)
 - Trade-off: Less interpretable than Logistic Regression but significantly better performance
-**Related:** `notebooks/modeling/03_model_training.ipynb` (Sections 3-5)
+**Related:** `notebooks/modeling/03_model_training.ipynb` (Sections 4-6)
 
 ---
 
@@ -234,7 +236,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - **Cost per additional fraud caught**: $94.99 (vs $75 median fraud amount — slightly negative ROI on cost alone)
 - **Trade-off justified**: Preventing $213K in fraud losses (2,840 frauds × $75) costs $270K, but includes intangible benefits (reputation, compliance)
 - **False positives**: 3,248 → 51,524 (15.8x increase, significant analyst workload)
-**Related:** `notebooks/modeling/03_model_training.ipynb` (Cell 31)
+**Related:** `notebooks/modeling/03_model_training.ipynb` (Section 6)
 
 ---
 
@@ -264,7 +266,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - **Efficiency gain**: Minimal cost reduction but enables faster blocking of high-confidence fraud
 - **Test set validation**: 76% recall confirmed, production strategy is robust
 - **Configuration saved**: `threshold_config.pkl` contains all parameters for deployment
-**Related:** `notebooks/modeling/03_model_training.ipynb` (Cells 32-33, 37)
+**Related:** `notebooks/modeling/03_model_training.ipynb` (Section 6)
 
 ---
 
@@ -370,5 +372,52 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Pattern is reusable: any future dashboard can create slim data extracts for deployment
 **Related:** `notebooks/dashboard/dashboard_app.py` (load_test_data function), `.gitignore`
 
+### [DECISION-014] Bayesian Optimization (Optuna) Over Grid Search for Hyperparameter Tuning
+**Date:** 2026-02-19
+**Status:** ✅ Implemented
+**Context:** Notebook 03 originally used a 6-combination grid search to tune XGBoost. As a third model (LightGBM) was added and a wider parameter space was needed, grid search became impractical.
+**Decision:** Replace grid search extension with Optuna Bayesian optimization (TPE sampler, 30 trials per model) as the primary tuning method. Keep original 6-combination grid search as Section 6.1 for comparison.
+**Rationale:**
+- **Efficiency**: 30 Bayesian trials consistently outperform 6 grid combinations (each trial learns from prior results)
+- **Wider search space**: Bayesian search explores 6 continuous parameters vs 3 discrete grid values
+- **Two models**: Running grid search for both XGBoost and LightGBM would require 12+ combinations; Optuna handles both cleanly
+- **Industry standard**: Optuna TPE sampler is widely used for ML hyperparameter optimization
+- **Transparency**: Optuna study objects retain full trial history for audit/comparison
+**Alternatives Considered:**
+- Extended grid search (>6 combos): Grows exponentially with parameter count; impractical for 6 parameters
+- Random search: No learning between trials; less efficient than Bayesian on limited budget
+- Hyperopt / scikit-optimize: Similar capability; Optuna chosen for cleaner API and progress bar support
+**Consequences:**
+- Bayesian tuning takes ~5-10 minutes per model (30 trials x ~10-20 seconds each)
+- Best params stored in `study_xgb.best_params` and `study_lgb.best_params` (Optuna study objects)
+- XGBoost Bayesian PR-AUC: 0.1110 vs grid search 0.1098 (+1.1% improvement)
+- LightGBM Bayesian PR-AUC: 0.1133 (no grid search baseline for comparison)
+- Grid search section retained as 6.1 for pedagogical comparison
+**Related:** `notebooks/modeling/03_model_training.ipynb` (Section 6.2), DECISION-015
+
 ---
 
+### [DECISION-015] LightGBM as Third Model for Gradient Boosting Comparison
+**Date:** 2026-02-19
+**Status:** ✅ Implemented
+**Context:** Notebook 03 compared Logistic Regression (baseline) vs XGBoost. Adding a third model provides richer evidence for model selection and demonstrates awareness of the broader ML landscape.
+**Decision:** Add LightGBM as a third model trained with identical features, same cost structure, and Bayesian hyperparameter tuning. Include it in the 4-model fair comparison table.
+**Rationale:**
+- **Apples-to-apples**: Both XGBoost and LightGBM are gradient boosting; comparing them isolates architectural differences (level-wise vs leaf-wise growth)
+- **Industry relevance**: LightGBM is co-equal with XGBoost as a production fraud detection standard
+- **Class imbalance**: LightGBM`s `is_unbalance=True` provides an alternative mechanism to XGBoost`s `scale_pos_weight`
+- **Portfolio signal**: Shows ability to evaluate and select among competing algorithms, not just apply a single tool
+- **Winner selection**: Dynamic selection ensures the better model is always used downstream
+**Alternatives Considered:**
+- CatBoost: Also gradient boosting, but adds another training time cost; LightGBM is more common in fraud detection literature
+- Random Forest: Different family (bagging vs boosting); less directly comparable to XGBoost
+- Neural Network (MLP): Poor fit for 7 features with high class imbalance and regulatory explainability requirements
+**Consequences:**
+- Section 5 added (LightGBM initial training, 3 cells)
+- Section 6.2 runs Optuna for both XGBoost and LightGBM (adds ~10 minutes to total runtime)
+- 4-model comparison table in Section 7 provides clear winner narrative
+- LightGBM Bayesian wins current run (PR-AUC 0.1133 vs 0.1110 XGBoost Bayesian)
+- No changes needed to Phase 4 (SHAP) or Phase 5 (dashboard) since they load by filename
+**Related:** `notebooks/modeling/03_model_training.ipynb` (Section 5, Section 6.2, Section 7), DECISION-014
+
+---

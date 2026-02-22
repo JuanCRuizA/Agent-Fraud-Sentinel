@@ -132,15 +132,17 @@
 
 ## 03_model_training.ipynb
 
-**Date:** 2026-02-08
-**Status:** ✅ Completed (41 cells)
+**Date:** 2026-02-08 (updated 2026-02-19)
+**Status:** ✅ Completed (51 cells)
 **Location:** `notebooks/modeling/03_model_training.ipynb`
 **Objective:** Train and evaluate machine learning models for real-time fraud detection with production-ready threshold optimization.
 
 ### Focus Areas
 - Baseline model (Logistic Regression) for interpretable benchmark
 - Advanced model (XGBoost) with class imbalance handling
-- Hyperparameter tuning via simple grid search
+- Advanced model (LightGBM) for apples-to-apples gradient boosting comparison
+- Hyperparameter tuning: grid search (6 combinations) + Bayesian optimization via Optuna (30 trials each)
+- Dynamic winner selection (best PR-AUC on validation set)
 - Cost-based threshold optimization
 - Constrained optimization with minimum recall requirement (75%)
 - Multi-threshold production strategy (auto-block + manual review)
@@ -150,64 +152,69 @@
 
 | Section | Content |
 |---------|---------|
-| 1. Setup & Data Loading | Load train/val/test splits from Phase 2, define 7 engineered features |
-| Data Cleaning | Handle infinity/NaN in `amount_deviation` feature before StandardScaler |
-| 2. Baseline Model | Logistic Regression with class_weight='balanced', PR-AUC: 0.0821 |
-| 3. Advanced Model | XGBoost with scale_pos_weight=28.56, initial PR-AUC: 0.1093 |
-| 4. Hyperparameter Tuning | Grid search (6 combinations), best PR-AUC: 0.1098 (max_depth=6, n_estimators=200, lr=0.05) |
-| 5. Model Comparison | Fair comparison at threshold 0.5 + cost-based threshold optimization |
-| Unconstrained Optimization | Optimal threshold 0.740 (14.4% recall, $328K cost) - too low for production |
-| Constrained Optimization | 75% minimum recall at threshold 0.410 ($598K cost) |
-| Multi-Threshold Strategy | Auto-block (≥0.9) + Manual review (0.41-0.9) + Auto-approve (<0.41) |
-| Test Set Evaluation | Final production performance: 76% recall, $598K cost on test set |
-| Confusion Matrices | Two visualizations (numbers + percentages) for production strategy |
-| Model Persistence | Save XGBoost model, scaler, and multi-threshold config to `models/` |
-| Summary & Next Steps | Key findings, production strategy, Phase 4 roadmap |
+| 1. Setup & Data Loading | Load train/val/test splits from Phase 2; imports include `lightgbm` and `optuna` |
+| 2. Data Preparation | Define 7 engineered features, cost assumptions, handle infinity/NaN in `amount_deviation` |
+| 3. Baseline Model: Logistic Regression | class_weight='balanced', PR-AUC: 0.0821 |
+| 4. Advanced Model: XGBoost | scale_pos_weight=28.56, initial PR-AUC: 0.1093 |
+| 5. Advanced Model: LightGBM | is_unbalance=True, leaf-wise growth, initial PR-AUC comparison |
+| 6. Hyperparameter Tuning | 6.1 Grid search (6 combos, best PR-AUC: 0.1098); 6.2 Bayesian optimization via Optuna (30 trials each for XGBoost and LightGBM) |
+| 7. Model Comparison & Threshold Selection | 4-model fair comparison at threshold 0.5; dynamic winner selection; cost-based threshold optimization; constrained (75% recall); multi-threshold production strategy; confusion matrices |
+| 8. Model Persistence | Save winner model as `best_model_final.pkl` + `xgboost_final.pkl` (backwards compat); scaler; threshold config with `winning_model` field |
+| 9. Summary & Next Steps | Key findings, production strategy, Phase 4 roadmap |
 
-### Visualizations (5 total)
-1. XGBoost feature importance (bar chart)
-2. Precision-Recall curve comparison (Logistic vs XGBoost)
-3. Cost vs threshold curve (U-shape optimization)
-4. Confusion matrix - numbers (heatmap with absolute counts)
-5. Confusion matrix - percentages (heatmap with % of total transactions)
+### Visualizations (6 total)
+1. LightGBM feature importance (bar chart)
+2. XGBoost feature importance (bar chart)
+3. Precision-Recall curve comparison (Logistic Regression vs winner model)
+4. Cost vs threshold curve (U-shape optimization)
+5. Confusion matrix - numbers (heatmap with absolute counts)
+6. Confusion matrix - percentages (heatmap with % of total transactions)
 
 ### Key Findings
 
-**Model Selection:**
-- **XGBoost outperforms Logistic Regression** by 33.8% (PR-AUC: 0.1098 vs 0.0821)
-- Fair comparison at threshold 0.5: XGBoost catches 60.9% of fraud vs 42.8% baseline
-- Hyperparameter tuning: best config uses max_depth=6, 200 estimators, learning_rate=0.05
+**Model Selection (4-model comparison at threshold 0.5):**
 
-**Threshold Optimization:**
-- **Pure cost minimization (threshold 0.740)**: Only 14.4% recall — catches just 508 of 4,064 frauds
-  - Unacceptable for production despite $328K cost (lowest)
-- **Constrained optimization (threshold 0.410)**: 76% recall with 75% minimum requirement
-  - Catches 3,505 frauds but costs $598K (82% increase)
-  - Cost per additional fraud caught: $94.99
+| Model | PR-AUC | Precision | Recall | F1-Score |
+|-------|--------|-----------|--------|----------|
+| Baseline (Logistic) | 0.0821 | 0.0693 | 0.4279 | 0.1193 |
+| XGBoost (grid search) | 0.1098 | 0.0813 | 0.6085 | 0.1435 |
+| XGBoost (Bayesian) | 0.1110 | 0.0787 | 0.6250 | 0.1397 |
+| LightGBM (Bayesian) | 0.1133 | 0.0848 | 0.6075 | 0.1488 |
+
+- **LightGBM (Bayesian) wins** with PR-AUC 0.1133 (38% improvement over baseline)
+- Bayesian optimization (30 trials) outperforms grid search (6 trials) for both models
+- LightGBM leaf-wise growth provides best PR-AUC; XGBoost Bayesian shows highest recall at 0.5
+
+**Threshold Optimization (based on winning model):**
+- **Pure cost minimization**: threshold 0.740, 14.4% recall (unacceptable for production)
+- **Constrained optimization (75% recall)**: threshold ~0.41, meets business requirement
+- Full production numbers confirmed after final run with LightGBM probabilities
 
 **Production Strategy (Multi-Threshold):**
-- **Auto-block (≥0.90)**: 19 transactions, 6 frauds caught, $65 cost (automated processing)
-- **Manual review (0.41-0.90)**: 55,010 transactions, 3,499 frauds caught, $515K cost (human analysts)
-- **Auto-approve (<0.41)**: 63,079 transactions, 1,106 frauds missed, $83K FN cost
-- **Overall**: 76% recall, 6.4% precision, $598K total cost on validation set
-- **Test set performance**: 76% recall confirmed, validates production readiness
+- **Auto-block (>=0.90)**: high-confidence fraud, automated processing
+- **Manual review (0.41-0.90)**: human analyst queue
+- **Auto-approve (<0.41)**: no review needed
+- All downstream cells dynamically use winner model probabilities (`final_proba_val`, `final_proba_test`)
 
 ### Key Technical Decisions
 
-1. **Data Cleaning**: Replace `inf` with ±10, `NaN` with 0 in amount_deviation feature
-2. **Class Imbalance**: scale_pos_weight=28.56 in XGBoost (reflects 3.5% fraud rate)
+1. **Data Cleaning**: Replace `inf` with +/-10, `NaN` with 0 in amount_deviation feature
+2. **Class Imbalance**: scale_pos_weight=28.56 (XGBoost), is_unbalance=True (LightGBM)
 3. **Evaluation Metric**: PR-AUC preferred over ROC-AUC for imbalanced data
 4. **Cost Parameters**: FN=$75 (median fraud), FP=$10 (manual review), ratio 7.5:1
 5. **Recall Constraint**: 75% minimum (business requirement overrides pure cost minimization)
 6. **Multi-Threshold**: Tiered strategy reduces manual review workload while maintaining recall
+7. **Dynamic Winner**: `final_proba_val`/`final_proba_test` set by winner selection; all downstream cells use these generic names
 
 ### Key Outputs
-- `models/xgboost_final.pkl` - Trained XGBoost model (best hyperparameters)
-- `models/scaler.pkl` - StandardScaler fitted on training data
+- `models/best_model_final.pkl` - Winning model (LightGBM Bayesian or XGBoost Bayesian, whichever has higher PR-AUC)
+- `models/xgboost_final.pkl` - XGBoost grid search model (kept for backwards compatibility with Phase 4/5)
+- `models/scaler.pkl` - StandardScaler fitted on training data only
 - `models/threshold_config.pkl` - Production configuration:
   - `auto_block_threshold`: 0.90 (high confidence fraud)
-  - `manual_review_threshold`: 0.410 (75% recall target)
+  - `manual_review_threshold`: ~0.41 (75% recall target)
   - `min_recall_target`: 0.75
+  - `winning_model`: name of winning algorithm
   - Cost parameters and feature list included
 
 ### Issues Encountered & Resolved
@@ -215,15 +222,21 @@
 - [ISSUE-006] NameError for variables defined out of order (recall_optimal, recall_test)
 - [ISSUE-007] F-string backslash syntax error in dictionary access
 - [ISSUE-008] Confusion about comparing models at different thresholds
+- [ISSUE-012] NameError pr_auc_final (forward reference from Section 7 used in Section 6.2)
+- [ISSUE-013] SyntaxError f-string unmatched '[' with dict key in Python 3.11
+- [ISSUE-014] NameError baseline_precision_05 / final_precision_05 never defined
+- [ISSUE-015] Downstream cells hardcoded to XGBoost probabilities after dynamic winner selection
 
 ### Validation Checklist
 - [x] Model trains without errors (data cleaning added)
 - [x] All cells run sequentially (Run All works)
-- [x] Fair model comparison at same threshold (0.5)
+- [x] Fair model comparison at same threshold (0.5) for all 4 models
+- [x] Bayesian optimization runs 30 trials per model without errors
+- [x] Dynamic winner selection correctly routes probabilities to downstream cells
 - [x] Cost-based threshold optimization implemented
 - [x] Constrained optimization with 75% recall constraint
 - [x] Multi-threshold strategy evaluated on validation and test sets
-- [x] Model artifacts saved with production configuration
+- [x] Model artifacts saved with production configuration (winner + XGBoost for compat)
 - [x] Confusion matrices visualized (numbers + percentages)
 
 ### Next Steps

@@ -150,3 +150,49 @@ print(f"Manual review threshold: >= {manual_threshold:.3f}")
 **Prevention:** For deployment artifacts, always create minimal data files with only the columns required by the application. Keep full datasets in `.gitignore` and commit only slim versions.
 
 ---
+
+### [ISSUE-012] NameError: `pr_auc_final` Not Defined in Bayesian Optimization Cell
+**Date:** 2026-02-19
+**Status:** ✅ Resolved
+**Severity:** 🟡 Medium
+**Problem:** `NameError: name 'pr_auc_final' is not defined` when running the Bayesian XGBoost optimization cell (Section 6.2) and the comparison table cell (Section 6.2 summary).
+**Root Cause:** `pr_auc_final` was only assigned in the Section 7 model comparison cell, which runs later. The Bayesian optimization cells in Section 6.2 referenced this variable as a forward reference, creating a dependency violation.
+**Solution:** Replaced all `pr_auc_final` references in Section 6.2 with `grid_search_pr_auc = best_params["PR-AUC"]`, which is already available from the grid search cell (Section 6.1). This gives the same value (XGBoost grid search best PR-AUC) without the forward dependency.
+**Prevention:** When adding new cells above an existing section, verify that all variable references are defined in prior cells. Never reference variables from later sections.
+
+---
+
+### [ISSUE-013] SyntaxError: F-string Unmatched `[` with Dict Key Access in Python 3.11
+**Date:** 2026-02-19
+**Status:** ✅ Resolved
+**Severity:** 🟢 Low
+**Problem:** `SyntaxError: f-string: unmatched '['` on the line `print(f'... {best_params['PR-AUC']:.4f}...')`.
+**Root Cause:** Python 3.11 does not allow using the same quote style for a dictionary key inside an f-string expression. Single-quoted keys `['key']` cannot appear inside a single-quoted f-string `f'...'`.
+**Solution:** Extract the dictionary access to a variable before the f-string: `grid_search_pr_auc = best_params["PR-AUC"]`, then use `{grid_search_pr_auc:.4f}` in the f-string. This is also the fix for ISSUE-012.
+**Prevention:** Always extract dict key accesses and complex expressions to named variables before using them in f-strings. This is both a Python 3.11 requirement and a readability improvement. (See also ISSUE-007 for a related f-string backslash issue.)
+
+---
+
+### [ISSUE-014] NameError: `baseline_precision_05` / `final_precision_05` Not Defined
+**Date:** 2026-02-19
+**Status:** ✅ Resolved
+**Severity:** 🟡 Medium
+**Problem:** `NameError: name 'baseline_precision_05' is not defined` in the 4-model fair comparison cell (Section 7). The cell also referenced `baseline_recall_05`, `baseline_f1_05`, `final_precision_05`, `final_recall_05`, `final_f1_05`.
+**Root Cause:** The new comparison cell was written with placeholder comments ("already computed") but the original notebook used different variable names: `precision_val_bl`, `recall_val_bl` (for Logistic Regression) and never computed threshold-0.5 metrics for the XGBoost grid search model. The `_05` suffix variables were never defined anywhere.
+**Solution:** Added explicit computations at the top of the comparison cell:
+- Logistic Regression: `baseline_pred_05 = (baseline_proba_val >= 0.5).astype(int)` then `precision_score / recall_score / f1_score`
+- XGBoost grid search: `final_pred_05 = (final_xgb_proba_val >= 0.5).astype(int)` then same pattern
+**Prevention:** When writing cells that reference variables as "already computed", verify the exact variable names from the source cells. Do not assume naming conventions — check the actual code.
+
+---
+
+### [ISSUE-015] Downstream Cells Hardcoded to XGBoost Probabilities After Dynamic Winner Selection
+**Date:** 2026-02-19
+**Status:** ✅ Resolved
+**Severity:** 🔴 Critical
+**Problem:** After adding dynamic winner selection in Section 7 (LightGBM Bayesian won with PR-AUC 0.1133), all downstream results (threshold optimization, constrained optimization, production strategy, confusion matrices) were identical to the original XGBoost notebook. The winner selection had no effect.
+**Root Cause:** 8 cells (39, 41, 42, 43, 44, 45, 46, 47) in Sections 7-8 still referenced `final_xgb_proba_val` and `final_xgb_proba_test` directly instead of the dynamic winner variables `final_proba_val` and `final_proba_test` set by the winner selection cell. The plan assumed these cells would "automatically" use the winner, but they contained hardcoded XGBoost variable names.
+**Solution:** Bulk replacement across all 8 cells: `final_xgb_proba_val` → `final_proba_val`, `final_xgb_proba_test` → `final_proba_test`. Verified zero remaining occurrences after fix.
+**Prevention:** When implementing dynamic model selection, immediately audit ALL downstream cells for hardcoded model-specific variable references. Variable naming conventions alone do not guarantee correct wiring.
+
+---
