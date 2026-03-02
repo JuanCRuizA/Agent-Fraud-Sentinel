@@ -747,10 +747,7 @@ ALL_CHAPTERS = [
             "fraud typologies (card testing, account takeover, new account fraud)."
         ),
         "matrix": CH3_MATRIX,
-        "figures": [
-            ("shap_dependence_top4.png",
-             "Figure 3: SHAP Dependence Plots \u2014 How the top 4 features' values affect fraud risk."),
-        ],
+        "figures": [],
         "callouts": [
             ("business",
              "Operational takeaway for fraud analysts: prioritize transactions with "
@@ -776,7 +773,7 @@ ALL_CHAPTERS = [
         "matrix": CH4_MATRIX,
         "figures": [
             ("shap_waterfall_cases.png",
-             "Figure 4: SHAP Waterfall Plots \u2014 Step-by-step decomposition of 6 case study decisions."),
+             "Figure 3: SHAP Waterfall Plots \u2014 Step-by-step decomposition of 6 case study decisions."),
         ],
         "callouts": [
             ("caution",
@@ -804,10 +801,10 @@ ALL_CHAPTERS = [
         "matrix": CH5_MATRIX,
         "figures": [
             ("shap_fraud_vs_legit.png",
-             "Figure 5: Fraud vs Legitimate SHAP Comparison \u2014 How the model distinguishes "
+             "Figure 4: Fraud vs Legitimate SHAP Comparison \u2014 How the model distinguishes "
              "the two groups at the feature level."),
             ("shap_risk_tiers.png",
-             "Figure 6: Feature Contribution by Risk Tier \u2014 What drives each decision level "
+             "Figure 5: Feature Contribution by Risk Tier \u2014 What drives each decision level "
              "(auto-approve, manual review, auto-block)."),
         ],
         "callouts": [
@@ -861,7 +858,7 @@ SUMMARY_TABLE_DATA = [
     ("Second Feature", "txn_count_24hr (24-hour velocity)"),
     ("Third Feature", "amount_deviation (spending anomaly)"),
     ("Case Studies", "6 (TP clear, TP velocity, FN, FP, auto-block, borderline)"),
-    ("Visualizations Produced", "6 (beeswarm, bar, dependence, waterfall, fraud-vs-legit, tiers)"),
+    ("Visualizations Produced", "5 (beeswarm, bar, waterfall, fraud-vs-legit, tiers)"),
     ("Fair Lending Features Reviewed", "7 (2 flagged MEDIUM risk)"),
     ("SR 11-7 Items Complete", "8 of 12 (67%)"),
     ("Governance Items Pending", "4 (require production data)"),

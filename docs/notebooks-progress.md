@@ -178,17 +178,17 @@
 |-------|--------|-----------|--------|----------|
 | Baseline (Logistic) | 0.0821 | 0.0693 | 0.4279 | 0.1193 |
 | XGBoost (grid search) | 0.1098 | 0.0813 | 0.6085 | 0.1435 |
-| XGBoost (Bayesian) | 0.1110 | 0.0787 | 0.6250 | 0.1397 |
-| LightGBM (Bayesian) | 0.1133 | 0.0848 | 0.6075 | 0.1488 |
+| XGBoost (Bayesian) | 0.1116 | 0.0806 | 0.6194 | 0.1426 |
+| LightGBM (Bayesian) | 0.1126 | 0.0844 | 0.6229 | 0.1486 |
 
-- **LightGBM (Bayesian) wins** with PR-AUC 0.1133 (38% improvement over baseline)
+- **LightGBM (Bayesian) wins** with PR-AUC 0.1126 (37.1% improvement over baseline)
 - Bayesian optimization (30 trials) outperforms grid search (6 trials) for both models
-- LightGBM leaf-wise growth provides best PR-AUC; XGBoost Bayesian shows highest recall at 0.5
+- LightGBM leaf-wise growth provides best PR-AUC and highest recall at 0.5 (0.6229)
 
 **Threshold Optimization (based on winning model):**
-- **Pure cost minimization**: threshold 0.740, 14.4% recall (unacceptable for production)
-- **Constrained optimization (75% recall)**: threshold ~0.41, meets business requirement
-- Full production numbers confirmed after final run with LightGBM probabilities
+- **Pure cost minimization**: threshold 0.720, 17.1% recall, $326K cost (unacceptable for production)
+- **Constrained optimization (75% recall floor)**: threshold 0.410, actual recall 76.6%, $578K validation cost (+77.2%)
+- **Test set (unbiased)**: 74.4% recall, 3,025 of 4,064 frauds caught, precision 5.8%, $572,900 total cost
 
 **Production Strategy (Multi-Threshold):**
 - **Auto-block (>=0.90)**: high-confidence fraud, automated processing

@@ -187,37 +187,35 @@ Document key technical decisions, rationale, and alternatives considered during 
 
 ---
 
-### [DECISION-007] XGBoost Over Logistic Regression for Production Model
-**Date:** 2026-02-08
+### [DECISION-007] LightGBM (Bayesian) as Production Model
+**Date:** 2026-02-08 (updated 2026-02-19)
 **Status:** ✅ Implemented
-**Context:** Need to select the best-performing model for production deployment. Baseline (Logistic Regression) provides interpretability, but may lack predictive power for complex fraud patterns.
-**Decision:** Deploy XGBoost as the production model after hyperparameter tuning.
+**Context:** After training four models (Logistic Regression, XGBoost initial, XGBoost Bayesian, LightGBM Bayesian), need to select the best-performing model for production deployment. Winner is determined dynamically by PR-AUC on the validation set.
+**Decision:** Deploy LightGBM (Bayesian, 30 Optuna trials) as the production model (saved as `best_model_final.pkl`). XGBoost grid search model retained as `xgboost_final.pkl` for backwards compatibility with Phase 4/5 notebooks.
 **Rationale:**
-- **PR-AUC improvement**: XGBoost (0.1098) outperforms Logistic Regression (0.0821) by 33.8%
-- **Fair comparison at threshold 0.5**: XGBoost catches 60.9% of fraud vs 42.8% baseline
-- **Non-linear patterns**: Fraud detection involves complex interactions that tree-based models capture better
-- **Feature importance**: XGBoost provides interpretable tree-based importance metrics
-- **Industry standard**: XGBoost is widely used in production fraud detection systems
-- **Class imbalance handling**: Built-in `scale_pos_weight` parameter (set to 28.56 for 3.5% fraud rate)
+- **PR-AUC improvement**: LightGBM Bayesian (0.1126) outperforms LR (0.0821) by 37.1% and XGBoost grid search (0.1098) by 2.5%
+- **Fair comparison at threshold 0.5**: LightGBM Bayesian catches 62.3% of fraud (0.6229 recall) — highest of all four models
+- **Non-linear patterns**: Leaf-wise tree growth captures complex feature interactions better than level-wise XGBoost for this dataset
+- **Dynamic winner selection**: All downstream cells use `final_proba_val`/`final_proba_test` — if XGBoost Bayesian outperforms on a future run, it will be selected automatically
+- **Industry standard**: LightGBM is widely used in production fraud detection systems alongside XGBoost
 **Alternatives Considered:**
 - Logistic Regression: Simpler and more interpretable, but lower PR-AUC (0.0821)
-- Random Forest: Similar to XGBoost but typically slower and less performant
-- LightGBM/CatBoost: Could be explored in future iterations for potential speed/performance gains
+- XGBoost (grid search, 6 trials): PR-AUC 0.1098 — good baseline but outperformed by Bayesian models
+- XGBoost (Bayesian, 30 trials): PR-AUC 0.1116 — close second; retained as `xgboost_final.pkl` for Phase 4/5 compatibility
 - Neural Networks: Overkill for 7 features, harder to interpret, requires more data
 **Consequences:**
-- Best hyperparameters: max_depth=6, n_estimators=200, learning_rate=0.05 (from grid search)
-- Model file size: ~500KB (xgboost_final.pkl) — small enough for real-time deployment
-- Training time: ~30 seconds on full dataset (acceptable for retraining cadence)
+- Winning model saved as `best_model_final.pkl` (LightGBM Bayesian, ~690KB)
+- `xgboost_final.pkl` retained for Phase 4/5 backwards compatibility
 - Inference time: <1ms per transaction (meets real-time requirement)
-- Trade-off: Less interpretable than Logistic Regression but significantly better performance
-**Related:** `notebooks/modeling/03_model_training.ipynb` (Sections 4-6)
+- Trade-off: Less interpretable than Logistic Regression but 37.1% better PR-AUC
+**Related:** `notebooks/modeling/03_model_training.ipynb` (Sections 5-7), DECISION-014, DECISION-015
 
 ---
 
 ### [DECISION-008] Constrained Optimization with 75% Minimum Recall Over Pure Cost Minimization
 **Date:** 2026-02-08
 **Status:** ✅ Implemented
-**Context:** Unconstrained cost optimization found threshold 0.740 with lowest total cost ($328K), but this only catches 14.4% of fraud (665 of 4,611 frauds). Real banks prioritize fraud detection over pure cost minimization.
+**Context:** Unconstrained cost optimization found threshold 0.720 with lowest total cost ($326K), but this only catches 17.1% of fraud (788 of 4,611 frauds). Real banks prioritize fraud detection over pure cost minimization.
 **Decision:** Implement constrained optimization requiring minimum 75% recall, resulting in threshold 0.410.
 **Rationale:**
 - **Business reality**: Banks cannot tolerate catching only 14% of fraud, even if it minimizes immediate operational cost
@@ -226,16 +224,16 @@ Document key technical decisions, rationale, and alternatives considered during 
 - **Long-term cost**: Reputational damage and regulatory fines exceed short-term operational savings
 - **75% target**: Realistic balance between catching most fraud (76% actual) while controlling false positive costs
 **Alternatives Considered:**
-1. **Unconstrained optimization (threshold 0.740)**: 14.4% recall, $328K cost — rejected as unacceptable
+1. **Unconstrained optimization (threshold 0.720)**: 17.1% recall, $326K cost — rejected as unacceptable
 2. **Higher recall targets (85-90%)**: Would require threshold ~0.25-0.30, causing FP explosion (100K+ false alarms)
 3. **Fixed threshold (0.5)**: Arbitrary choice, doesn't account for business costs (60.9% recall, moderate cost)
 **Consequences:**
-- **Threshold shifts**: From 0.740 (unconstrained) to 0.410 (constrained 75%)
-- **Recall improvement**: 14.4% → 76.0% (catches 2,840 additional frauds on validation set)
-- **Cost increase**: $328K → $598K (82% increase, or +$270K)
-- **Cost per additional fraud caught**: $94.99 (vs $75 median fraud amount — slightly negative ROI on cost alone)
+- **Threshold shifts**: From 0.720 (unconstrained) to 0.410 (constrained 75%)
+- **Recall improvement**: 17.1% → 76.6% (catches 2,743 additional frauds on validation set)
+- **Cost increase**: $326K → $578K (77.2% increase, or +$252K)
+- **Cost per additional fraud caught**: $91.87 (vs $75 median fraud amount — slightly negative ROI on cost alone)
 - **Trade-off justified**: Preventing $213K in fraud losses (2,840 frauds × $75) costs $270K, but includes intangible benefits (reputation, compliance)
-- **False positives**: 3,248 → 51,524 (15.8x increase, significant analyst workload)
+- **False positives**: 3,976 → 49,748 (12.5x increase, significant analyst workload)
 **Related:** `notebooks/modeling/03_model_training.ipynb` (Section 6)
 
 ---
@@ -259,10 +257,10 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Four-tier strategy: Adding "auto-approve-with-monitoring" tier (0.30-0.41) adds complexity without clear benefit
 - Adaptive thresholds: Dynamic adjustment based on fraud rate trends (future enhancement)
 **Consequences:**
-- **Auto-block segment**: 19 transactions (0.02%), 6 frauds caught, 13 false positives, $65 cost
-- **Manual review segment**: 55,010 transactions (46.6%), 3,499 frauds caught, 51,511 FPs, $515K cost
-- **Auto-approve segment**: 63,079 transactions (53.4%), 1,106 frauds missed, $83K FN cost
-- **Total cost**: $598K (same as single threshold, slight savings from $5 auto-block)
+- **Auto-block segment**: 8 transactions (0.01%), 1 fraud caught, 7 false positives, $35 cost
+- **Manual review segment**: 53,271 transactions (45.1%), 3,530 frauds caught, 49,741 FPs, $497K cost
+- **Auto-approve segment**: 64,829 transactions (54.9%), 1,080 frauds missed, $81K FN cost
+- **Total cost**: $578K (same as single threshold, slight savings from $5 auto-block)
 - **Efficiency gain**: Minimal cost reduction but enables faster blocking of high-confidence fraud
 - **Test set validation**: 76% recall confirmed, production strategy is robust
 - **Configuration saved**: `threshold_config.pkl` contains all parameters for deployment
@@ -390,8 +388,8 @@ Document key technical decisions, rationale, and alternatives considered during 
 **Consequences:**
 - Bayesian tuning takes ~5-10 minutes per model (30 trials x ~10-20 seconds each)
 - Best params stored in `study_xgb.best_params` and `study_lgb.best_params` (Optuna study objects)
-- XGBoost Bayesian PR-AUC: 0.1110 vs grid search 0.1098 (+1.1% improvement)
-- LightGBM Bayesian PR-AUC: 0.1133 (no grid search baseline for comparison)
+- XGBoost Bayesian PR-AUC: 0.1116 vs grid search 0.1098 (+1.6% improvement)
+- LightGBM Bayesian PR-AUC: 0.1126 (no grid search baseline for comparison)
 - Grid search section retained as 6.1 for pedagogical comparison
 **Related:** `notebooks/modeling/03_model_training.ipynb` (Section 6.2), DECISION-015
 
@@ -416,7 +414,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Section 5 added (LightGBM initial training, 3 cells)
 - Section 6.2 runs Optuna for both XGBoost and LightGBM (adds ~10 minutes to total runtime)
 - 4-model comparison table in Section 7 provides clear winner narrative
-- LightGBM Bayesian wins current run (PR-AUC 0.1133 vs 0.1110 XGBoost Bayesian)
+- LightGBM Bayesian wins current run (PR-AUC 0.1126 vs 0.1116 XGBoost Bayesian)
 - No changes needed to Phase 4 (SHAP) or Phase 5 (dashboard) since they load by filename
 **Related:** `notebooks/modeling/03_model_training.ipynb` (Section 5, Section 6.2, Section 7), DECISION-014
 

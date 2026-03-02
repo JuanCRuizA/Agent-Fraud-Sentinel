@@ -103,8 +103,8 @@ CH0_MATRIX = {
     # BANK GAINS
     (3, 0): (
         "Produced 7 features with confirmed fraud signal (velocity fraud rate jumps "
-        "from 2.9% at 0 txns/hr to 11.4% at 50+/hr; first transactions show 4.84% "
-        "fraud vs 3.26% returning). No multicollinearity (no pairs >0.95). "
+        "from 2.9% at 0 txns/hr to 11.4% at 50+/hr; returning clients show 3.67% "
+        "fraud vs 2.53% for first-time buyers). No multicollinearity (no pairs >0.95). "
         "Leakage-free design ensures model performance transfers to production."
     ),
     (3, 1): (
@@ -283,7 +283,7 @@ CH3_MATRIX = {
         "Computed two behavioral features: amount_deviation (Z-score of TransactionAmt "
         "vs client's expanding mean/std, with shift(1) to exclude current row) and "
         "is_first_transaction (binary: 1 if cumcount()==0 for that client_id). "
-        "Confirmed signal: first transactions show 4.84% fraud vs 3.26% for returning."
+        "Confirmed signal: returning clients show 3.67% fraud vs 2.53% for first-time buyers."
     ),
     (0, 1): (
         "Created two behavioral indicators: (1) how unusual the purchase amount is "
@@ -340,22 +340,22 @@ CH3_MATRIX = {
     (3, 0): (
         "Amount deviation creates a per-client anomaly signal that TransactionAmt alone "
         "cannot provide. Extreme deviations (Z > 2) show elevated fraud rates. "
-        "First-transaction flag captures 15.3% of all transactions (90,375 clients) "
-        "with a 48% higher fraud rate (4.84% vs 3.26%), providing a strong "
-        "cold-start risk indicator."
+        "First-transaction flag covers 15.3% of all transactions (90,375 clients). "
+        "Returning clients show a 45% higher fraud rate (3.67% vs 2.53%) — established "
+        "transaction history is itself a risk signal."
     ),
     (3, 1): (
         "The bank can now detect spending anomalies on a per-customer basis. "
         "A customer suddenly spending far above their norm triggers a higher risk "
-        "score. Additionally, first-time transactions \u2014 which represent 15% of "
-        "all transactions \u2014 are flagged as inherently riskier, allowing the "
-        "bank to apply stricter scrutiny to new customers."
+        "score. Additionally, returning clients carry a slightly higher observed fraud rate "
+        "(3.67% vs 2.53% for first-time buyers), indicating that established "
+        "transaction history correlates with higher fraud exposure."
     ),
     (3, 2): (
         "The bank can now spot when someone buys something unusually expensive "
         "(or cheap) compared to their normal habits. And it knows that first-time "
-        "buyers need extra attention \u2014 they're about 50% more likely to be "
-        "fraudsters than returning customers."
+        "established clients carry a slightly higher fraud rate (3.67% vs 2.53%) \u2014 the "
+        "model uses behavioral history as a risk signal."
     ),
 }
 
@@ -754,20 +754,19 @@ ALL_CHAPTERS = [
             "Behavioral features capture per-client anomalies. The amount_deviation Z-score "
             "compares each transaction to the client's expanding historical mean and standard "
             "deviation, using shift(1) to prevent leakage. The is_first_transaction flag "
-            "identifies cold-start cases (15.3% of all transactions), where fraud rate is "
-            "48% higher than for returning customers (4.84% vs 3.26%)."
+            "identifies cold-start cases (15.3% of all transactions), where returning clients show a higher fraud rate (3.67%) than first-time buyers (2.53%) — a 45% difference."
         ),
         "matrix": CH3_MATRIX,
         "figures": [
             ("tier2_signal.png",
              "Figure 2: Tier 2 signal confirmation. Left: fraud rate by amount deviation "
-             "(Z-score bins). Right: fraud rate for first-time (4.84%) vs returning (3.26%) "
-             "customers \u2014 a 48% increase for first transactions."),
+             "(Z-score bins). Right: fraud rate for returning (3.67%) vs first-time (2.53%) "
+             "clients \u2014 returning clients carry a 45% higher fraud rate."),
         ],
         "callouts": [
-            ("insight", "First-time transactions represent 15.3% of all activity but carry "
-             "a 48% higher fraud rate. This cold-start signal is critical for the model "
-             "because new customers have no behavioral history to evaluate."),
+            ("insight", "Returning clients carry a 45% higher fraud rate than first-time buyers (3.67% "
+             "vs 2.53%). Established behavioral history is itself a risk signal — the model "
+             "correctly flags returning clients at slightly higher rates."),
         ],
     },
     {
@@ -1232,7 +1231,7 @@ def add_feature_tier_table(doc):
          "Fraud rate 2.9% \u2192 11.4% at high velocity"),
         ("Tier 2 \u2014 Behavioral", "amount_deviation\nis_first_transaction",
          "Z-score vs client history; binary first-transaction flag",
-         "First txns: 4.84% fraud vs 3.26% returning"),
+         "Returning: 3.67% fraud vs first-time: 2.53%"),
         ("Tier 3 \u2014 Temporal", "hour_of_day\nis_weekend",
          "Hour (0-23) and weekend flag from TransactionDT",
          "Weekend: 3.79% vs weekday: 3.40%"),

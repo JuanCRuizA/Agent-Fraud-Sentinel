@@ -52,6 +52,15 @@ st.markdown("""
     }
     .footer a { color: #1a365d; text-decoration: none; }
     .footer a:hover { text-decoration: underline; }
+    .toc-box {
+        background: #eef2f7;
+        padding: 14px 20px;
+        border-radius: 8px;
+        border-left: 4px solid #1a365d;
+        margin-bottom: 16px;
+    }
+    .toc-box a { color: #1a365d; text-decoration: none; }
+    .toc-box a:hover { text-decoration: underline; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -65,8 +74,9 @@ except NameError:
     BASE_PATH = Path.cwd()
 
 MODEL_PATH = BASE_PATH / '..' / '..' / 'models'
-DATA_PATH = BASE_PATH  # slim test data lives alongside the app
+DATA_PATH = BASE_PATH
 FIGURES_PATH = BASE_PATH / '..' / '..' / 'figures' / 'shap'
+MT_FIGURES_PATH = BASE_PATH / '..' / '..' / 'figures' / 'model_training'
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -74,17 +84,15 @@ FIGURES_PATH = BASE_PATH / '..' / '..' / 'figures' / 'shap'
 # ─────────────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model_artifacts():
-    """Load XGBoost model, scaler, and threshold configuration."""
-    model = joblib.load(MODEL_PATH / 'xgboost_final.pkl')
-    scaler = joblib.load(MODEL_PATH / 'scaler.pkl')
+    """Load LightGBM model and threshold configuration."""
+    model = joblib.load(MODEL_PATH / 'best_model_final.pkl')
     threshold_config = joblib.load(MODEL_PATH / 'threshold_config.pkl')
-    return model, scaler, threshold_config
+    return model, threshold_config
 
 
 @st.cache_data
 def load_test_data():
     """Load the held-out test set (most recent transactions)."""
-    # Try slim dashboard file first, fall back to full test set
     slim = DATA_PATH / 'test_dashboard.csv'
     full = BASE_PATH / '..' / '..' / 'data' / 'processed' / 'test.csv'
     path = slim if slim.exists() else full
@@ -92,24 +100,41 @@ def load_test_data():
 
 
 @st.cache_data
-def compute_predictions(_model, df, features):
+def compute_predictions(_model, _df, features):
     """Generate fraud scores for all test transactions."""
-    X = df[features].copy()
+    X = _df[features].copy()
     X = X.replace([np.inf, -np.inf], [10, -10]).fillna(0)
-    y_true = df['isFraud'].values
+    y_true = _df['isFraud'].values
     y_scores = _model.predict_proba(X)[:, 1]
     return X, y_true, y_scores
 
 
+@st.cache_data
+def build_client_data(_df_test, _all_scores):
+    """Build per-transaction scored data and per-client summary."""
+    keep_cols = [c for c in ['TransactionID', 'TransactionDT', 'TransactionAmt',
+                              'client_id', 'isFraud'] if c in _df_test.columns]
+    df = _df_test[keep_cols].copy()
+    df['fraud_score'] = _all_scores
+    client_stats = df.groupby('client_id').agg(
+        txn_count=('fraud_score', 'count'),
+        max_score=('fraud_score', 'max'),
+        mean_score=('fraud_score', 'mean'),
+        fraud_txns=('isFraud', 'sum'),
+        total_amount=('TransactionAmt', 'sum'),
+    ).reset_index()
+    return df, client_stats
+
+
 # Load everything
 try:
-    model, scaler, threshold_config = load_model_artifacts()
+    model, threshold_config = load_model_artifacts()
     df_test = load_test_data()
 
     FEATURES = threshold_config['features']
     AUTO_BLOCK = threshold_config['auto_block_threshold']
     MANUAL_REVIEW = threshold_config['manual_review_threshold']
-    FN_COST = threshold_config.get('fn_cost', 75.0)
+    FN_COST = threshold_config.get('fn_cost', 227.0)
     FP_COST = threshold_config.get('fp_cost', 10.0)
 
     X_test, y_test, fraud_scores = compute_predictions(model, df_test, FEATURES)
@@ -129,7 +154,7 @@ FEATURE_LABELS = {
     'txn_count_1hr': 'Transaction Velocity (1 hour)',
     'txn_count_24hr': 'Transaction Velocity (24 hours)',
     'amount_deviation': 'Spending Anomaly Score',
-    'is_first_transaction': 'First-Time Transaction',
+    'is_first_transaction': 'First-Time Transaction Flag',
     'hour_of_day': 'Time of Day',
     'is_weekend': 'Weekend Transaction',
     'TransactionAmt': 'Transaction Amount ($)'
@@ -137,7 +162,7 @@ FEATURE_LABELS = {
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Reusable Footer (appears at the bottom of EVERY tab)
+# Reusable Footer
 # ─────────────────────────────────────────────────────────────────────
 FOOTER_HTML = """
 <div class="footer">
@@ -146,8 +171,7 @@ FOOTER_HTML = """
        target="_blank">
         https://github.com/JuanCRuizA/Agent-Fraud-Sentinel.git
     </a><br>
-    Developed by Juan Carlos Ruiz Arteaga<br>
-    Banking Data Scientist<br>
+    Developed by Juan Carlos Ruiz Arteaga | Banking Data Scientist<br>
     MSc in Data Science &amp; AI, University of Liverpool<br>
     Contact: j.ruiz-arteaga@liverpool.ac.uk
 </div>
@@ -155,31 +179,18 @@ FOOTER_HTML = """
 
 
 def render_footer():
-    """Render the standard project footer."""
     st.markdown("---")
     st.markdown(FOOTER_HTML, unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Sidebar
+# Sidebar - Global Configuration Panel
 # ─────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.title("BAFS")
     st.caption("Banking Anti-Fraud System")
     st.markdown("---")
 
-    page = st.radio(
-        "Navigation",
-        [
-            "Executive Summary",
-            "Model Performance",
-            "Case Study Explorer",
-            "Regulatory Compliance",
-        ],
-        index=0,
-    )
-
-    st.markdown("---")
     st.subheader("Global Filters")
 
     risk_threshold = st.slider(
@@ -188,7 +199,10 @@ with st.sidebar:
         max_value=1.0,
         value=float(round(MANUAL_REVIEW, 2)),
         step=0.01,
-        help="Transactions scoring above this threshold are flagged for review.",
+        help=(
+            f"Transactions scoring above this value are flagged for review. "
+            f"Auto-block threshold: {AUTO_BLOCK:.2f}"
+        ),
     )
 
     sample_size = st.selectbox(
@@ -204,11 +218,29 @@ with st.sidebar:
 
     st.markdown("---")
 
+    st.subheader("Export")
+    flagged_mask = fraud_scores >= risk_threshold
+    flagged_export = df_test[
+        ['TransactionID', 'TransactionAmt', 'client_id', 'isFraud']
+    ].copy()
+    flagged_export['fraud_score'] = fraud_scores
+    flagged_export = flagged_export[flagged_mask]
+    csv_data = flagged_export.to_csv(index=False)
+    st.download_button(
+        label=f"Export Flagged ({flagged_mask.sum():,} txns)",
+        data=csv_data,
+        file_name="flagged_transactions.csv",
+        mime="text/csv",
+        help="Download all transactions above the current threshold as CSV.",
+    )
+
+    st.markdown("---")
+
     with st.expander("About & Methods"):
         st.markdown(
             "- **Dataset:** IEEE-CIS Fraud Detection (590,540 transactions)\n"
-            "- **Model:** XGBoost with cost-sensitive optimization\n"
-            "- **Cost structure:** $75 FN / $10 FP (ratio 7.5 : 1)\n"
+            "- **Model:** LightGBM with Bayesian optimization\n"
+            "- **Cost structure:** $227 FN / $10 FP (ratio 22.7 : 1)\n"
             "- **Explainability:** SHAP TreeExplainer\n"
             "- **Compliance:** Aligned with Federal Reserve SR 11-7"
         )
@@ -232,15 +264,23 @@ y_pred_filt = (scores_filt >= risk_threshold).astype(int)
 
 
 # =====================================================================
-#  PAGE CONTENT
+#  MAIN TABS
 # =====================================================================
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "Executive Summary",
+    "Model Comparison",
+    "Case Study Explorer",
+    "Client Risk Profile",
+    "Regulatory Compliance",
+])
 
-# ── TAB 1: Executive Summary ────────────────────────────────────────
-if page == "Executive Summary":
+
+# =====================================================================
+# TAB 1 - Executive Summary
+# =====================================================================
+with tab1:
     st.header("Executive Summary")
-    st.caption(
-        "Key performance indicators for the BAFS fraud detection system"
-    )
+    st.caption("Key performance indicators for the BAFS fraud detection system")
 
     # Compute KPIs
     tp = int(((y_filt == 1) & (y_pred_filt == 1)).sum())
@@ -256,23 +296,10 @@ if page == "Executive Summary":
     review_cost = fp * FP_COST
     total_cost = missed_fraud + review_cost
 
-    # KPI cards
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric(
-        "Fraud Detected",
-        f"{tp:,} / {total_fraud:,}",
-        f"{recall:.1%} recall",
-    )
-    k2.metric(
-        "False Positive Rate",
-        f"{fpr:.1%}",
-        f"{fp:,} false alarms",
-    )
-    k3.metric(
-        "Fraud Prevented",
-        f"${fraud_prevented:,.0f}",
-        f"{tp:,} transactions blocked",
-    )
+    k1.metric("Fraud Detected", f"{tp:,} / {total_fraud:,}", f"{recall:.1%} recall")
+    k2.metric("False Positive Rate", f"{fpr:.1%}", f"{fp:,} false alarms")
+    k3.metric("Fraud Prevented", f"${fraud_prevented:,.0f}", f"{tp:,} transactions blocked")
     k4.metric(
         "Total Operational Cost",
         f"${total_cost:,.0f}",
@@ -281,64 +308,50 @@ if page == "Executive Summary":
 
     st.markdown("---")
 
-    # Two-column: performance table + risk distribution
     left, right = st.columns(2)
 
     with left:
         st.subheader("Performance at Current Threshold")
         f1 = (
             2 * precision * recall / (precision + recall)
-            if (precision + recall) > 0
-            else 0
+            if (precision + recall) > 0 else 0
         )
-        perf_df = pd.DataFrame(
-            {
-                "Metric": [
-                    "Recall (Fraud Detection Rate)",
-                    "Precision (Confirmation Rate)",
-                    "F1-Score",
-                    "False Positive Rate",
-                    "Threshold Applied",
-                ],
-                "Value": [
-                    f"{recall:.2%}",
-                    f"{precision:.2%}",
-                    f"{f1:.4f}",
-                    f"{fpr:.2%}",
-                    f"{risk_threshold:.3f}",
-                ],
-            }
-        )
+        perf_df = pd.DataFrame({
+            "Metric": [
+                "Recall (Fraud Detection Rate)",
+                "Precision (Confirmation Rate)",
+                "F1-Score",
+                "False Positive Rate",
+                "Threshold Applied",
+            ],
+            "Value": [
+                f"{recall:.2%}",
+                f"{precision:.2%}",
+                f"{f1:.4f}",
+                f"{fpr:.2%}",
+                f"{risk_threshold:.3f}",
+            ],
+        })
         st.table(perf_df)
 
     with right:
         st.subheader("Risk Score Distribution")
         fig, ax = plt.subplots(figsize=(8, 5))
-        ax.hist(
-            scores_filt[y_filt == 0], bins=50, alpha=0.6,
-            color="#2196F3", label="Legitimate", density=True,
-        )
-        ax.hist(
-            scores_filt[y_filt == 1], bins=50, alpha=0.6,
-            color="#f44336", label="Fraud", density=True,
-        )
-        ax.axvline(
-            risk_threshold, color="#333", linestyle="--",
-            linewidth=2, label=f"Threshold ({risk_threshold:.2f})",
-        )
+        ax.hist(scores_filt[y_filt == 0], bins=50, alpha=0.6,
+                color="#2196F3", label="Legitimate", density=True)
+        ax.hist(scores_filt[y_filt == 1], bins=50, alpha=0.6,
+                color="#f44336", label="Fraud", density=True)
+        ax.axvline(risk_threshold, color="#333", linestyle="--",
+                   linewidth=2, label=f"Threshold ({risk_threshold:.2f})")
         ax.set_xlabel("Fraud Score", fontsize=12)
         ax.set_ylabel("Density", fontsize=12)
-        ax.set_title(
-            "Distribution of Fraud Scores",
-            fontsize=14, fontweight="bold",
-        )
+        ax.set_title("Distribution of Fraud Scores", fontsize=14, fontweight="bold")
         ax.legend(fontsize=10)
         ax.grid(alpha=0.3)
         plt.tight_layout()
         st.pyplot(fig)
         plt.close()
 
-    # Cost breakdown
     st.subheader("Cost Analysis")
     c1, c2, c3 = st.columns(3)
     c1.metric(
@@ -362,34 +375,88 @@ if page == "Executive Summary":
     render_footer()
 
 
-# ── TAB 2: Model Performance ────────────────────────────────────────
-elif page == "Model Performance":
-    st.header("Model Performance Analysis")
+# =====================================================================
+# TAB 2 - Model Comparison
+# =====================================================================
+with tab2:
+    st.header("Model Comparison")
     st.caption(
-        "Detailed evaluation of the XGBoost fraud detection model"
+        "Optimization journey and head-to-head performance comparison "
+        "of candidate models evaluated on the held-out test set"
     )
 
-    # Compute confusion matrix values for this page
+    # ── Optimization Journey ─────────────────────────────────────────
+    st.subheader("Optimization Journey")
+    journey_df = pd.DataFrame([
+        {
+            "Stage": "1",
+            "Model": "XGBoost",
+            "Optimization": "Bayesian (Optuna)",
+            "Test Recall": "74.3%",
+            "ROC-AUC": "0.7168",
+            "PR-AUC": "0.0883",
+            "Total Cost": "$739,792",
+            "Selected": "",
+        },
+        {
+            "Stage": "2",
+            "Model": "LightGBM",
+            "Optimization": "Bayesian (Optuna)",
+            "Test Recall": "73.8%",
+            "ROC-AUC": "0.7198",
+            "PR-AUC": "0.0899",
+            "Total Cost": "$730,482",
+            "Selected": "WINNER",
+        },
+    ])
+    st.dataframe(journey_df, use_container_width=True, hide_index=True)
+    st.caption(
+        "Both models evaluated at threshold = 0.420 on 118,108 test transactions "
+        "(chronological split, no data leakage). "
+        "LightGBM wins: $9,310 lower total cost and higher AUC despite marginally "
+        "lower recall. Cost minimisation is the primary selection criterion."
+    )
+
+    st.markdown("---")
+
+    # ── Pre-computed Performance Curves ──────────────────────────────
+    st.subheader("Performance Curves (from Notebook 03)")
+    pr_img = MT_FIGURES_PATH / "pr_curve_comparison.png"
+    cost_img = MT_FIGURES_PATH / "cost_vs_threshold.png"
+
+    img_l, img_r = st.columns(2)
+    with img_l:
+        if pr_img.exists():
+            st.image(
+                Image.open(pr_img),
+                caption="Precision-Recall Curve: XGBoost vs LightGBM",
+                use_container_width=True,
+            )
+        else:
+            st.info("pr_curve_comparison.png not found. Run notebook 03.")
+    with img_r:
+        if cost_img.exists():
+            st.image(
+                Image.open(cost_img),
+                caption="Total Cost vs Threshold (LightGBM, winning model)",
+                use_container_width=True,
+            )
+        else:
+            st.info("cost_vs_threshold.png not found. Run notebook 03.")
+
+    st.markdown("---")
+
+    # ── Live Confusion Matrix + ROC (winning model at current threshold) ──
+    st.subheader("LightGBM Performance at Current Threshold")
     cm = confusion_matrix(y_filt, y_pred_filt)
     tn_v, fp_v, fn_v, tp_v = cm.ravel()
 
-    # Row 1: Confusion Matrix + ROC
-    r1c1, r1c2 = st.columns(2)
-
-    with r1c1:
-        st.subheader("Confusion Matrix with Cost Overlay")
-        labels = np.array(
-            [
-                [
-                    f"TN\n{tn_v:,}\n$0",
-                    f"FP\n{fp_v:,}\n${fp_v * FP_COST:,.0f}",
-                ],
-                [
-                    f"FN\n{fn_v:,}\n${fn_v * FN_COST:,.0f}",
-                    f"TP\n{tp_v:,}\nPrevented",
-                ],
-            ]
-        )
+    cm_l, cm_r = st.columns(2)
+    with cm_l:
+        labels = np.array([
+            [f"TN\n{tn_v:,}\n$0", f"FP\n{fp_v:,}\n${fp_v * FP_COST:,.0f}"],
+            [f"FN\n{fn_v:,}\n${fn_v * FN_COST:,.0f}", f"TP\n{tp_v:,}\nPrevented"],
+        ])
         fig, ax = plt.subplots(figsize=(7, 6))
         sns.heatmap(
             cm, annot=labels, fmt="", cmap="Blues", ax=ax,
@@ -405,25 +472,18 @@ elif page == "Model Performance":
         st.pyplot(fig)
         plt.close()
 
-    with r1c2:
-        st.subheader("ROC Curve")
+    with cm_r:
         fpr_c, tpr_c, _ = roc_curve(y_filt, scores_filt)
         roc_auc_val = roc_auc_score(y_filt, scores_filt)
-
-        # Operating point at current threshold
         tpr_op = recall_score(y_filt, y_pred_filt)
         fpr_op = fp_v / (fp_v + tn_v) if (fp_v + tn_v) > 0 else 0
 
         fig, ax = plt.subplots(figsize=(7, 6))
-        ax.plot(
-            fpr_c, tpr_c, color="#1565C0", linewidth=2,
-            label=f"XGBoost (AUC = {roc_auc_val:.4f})",
-        )
+        ax.plot(fpr_c, tpr_c, color="#1565C0", linewidth=2,
+                label=f"LightGBM (AUC = {roc_auc_val:.4f})")
         ax.plot([0, 1], [0, 1], "k--", alpha=0.3, label="Random")
-        ax.scatter(
-            [fpr_op], [tpr_op], color="red", s=100, zorder=5,
-            label=f"Operating Point ({risk_threshold:.2f})",
-        )
+        ax.scatter([fpr_op], [tpr_op], color="red", s=100, zorder=5,
+                   label=f"Operating Point ({risk_threshold:.2f})")
         ax.set_xlabel("False Positive Rate", fontsize=12)
         ax.set_ylabel("True Positive Rate (Recall)", fontsize=12)
         ax.set_title("ROC Curve", fontsize=13, fontweight="bold")
@@ -433,87 +493,35 @@ elif page == "Model Performance":
         st.pyplot(fig)
         plt.close()
 
-    # Row 2: PR Curve + Feature Importance
-    r2c1, r2c2 = st.columns(2)
+    st.markdown("---")
 
-    with r2c1:
-        st.subheader("Precision-Recall Curve")
-        prec_c, rec_c, _ = precision_recall_curve(y_filt, scores_filt)
-        pr_auc_val = auc(rec_c, prec_c)
-
-        prec_op = (
-            precision_score(y_filt, y_pred_filt)
-            if y_pred_filt.sum() > 0 else 0
-        )
-        rec_op = (
-            recall_score(y_filt, y_pred_filt)
-            if y_filt.sum() > 0 else 0
-        )
-
-        fig, ax = plt.subplots(figsize=(7, 6))
-        ax.plot(
-            rec_c, prec_c, color="#1565C0", linewidth=2,
-            label=f"XGBoost (PR-AUC = {pr_auc_val:.4f})",
-        )
-        ax.axhline(
-            y=y_filt.mean(), color="red", linestyle="--",
-            alpha=0.5, label=f"Baseline ({y_filt.mean():.4f})",
-        )
-        ax.scatter(
-            [rec_op], [prec_op], color="red", s=100, zorder=5,
-            label=f"Operating Point ({risk_threshold:.2f})",
-        )
-        ax.set_xlabel("Recall", fontsize=12)
-        ax.set_ylabel("Precision", fontsize=12)
-        ax.set_title(
-            "Precision-Recall Curve", fontsize=13, fontweight="bold",
-        )
-        ax.legend(fontsize=10)
-        ax.grid(alpha=0.3)
-        ax.set_xlim([0, 1.05])
+    # ── Feature Importance ────────────────────────────────────────────
+    st.subheader("Feature Importance (SHAP - LightGBM)")
+    shap_img = FIGURES_PATH / "shap_feature_importance_bar.png"
+    if shap_img.exists():
+        st.image(Image.open(shap_img), use_container_width=True)
+    else:
+        importance = model.feature_importances_
+        imp_df = pd.DataFrame({
+            "Feature": [FEATURE_LABELS.get(f, f) for f in FEATURES],
+            "Importance": importance,
+        }).sort_values("Importance", ascending=True)
+        fig, ax = plt.subplots(figsize=(9, 5))
+        ax.barh(imp_df["Feature"], imp_df["Importance"], color="steelblue")
+        ax.set_xlabel("Importance (Gain)", fontsize=11)
+        ax.set_title("Feature Importance", fontsize=13, fontweight="bold")
         plt.tight_layout()
         st.pyplot(fig)
         plt.close()
 
-    with r2c2:
-        st.subheader("Feature Importance (Top 7)")
-        shap_img = FIGURES_PATH / "shap_feature_importance_bar.png"
-        if shap_img.exists():
-            st.image(
-                Image.open(shap_img), width="stretch",
-            )
-        else:
-            # Fallback: use model's built-in feature importances
-            importance = model.feature_importances_
-            imp_df = pd.DataFrame(
-                {
-                    "Feature": [
-                        FEATURE_LABELS.get(f, f) for f in FEATURES
-                    ],
-                    "Importance": importance,
-                }
-            ).sort_values("Importance", ascending=True)
-            fig, ax = plt.subplots(figsize=(7, 5))
-            ax.barh(
-                imp_df["Feature"], imp_df["Importance"],
-                color="steelblue",
-            )
-            ax.set_xlabel("Importance (Gain)", fontsize=11)
-            ax.set_title(
-                "Feature Importance", fontsize=13, fontweight="bold",
-            )
-            plt.tight_layout()
-            st.pyplot(fig)
-            plt.close()
+    st.markdown("---")
 
-    # Cost-Benefit Analysis Table
+    # ── Cost-Benefit Table ────────────────────────────────────────────
     st.subheader("Cost-Benefit Analysis by Threshold")
-    thresholds = sorted(
-        set(
-            [0.20, 0.30, round(MANUAL_REVIEW, 2), 0.50,
-             0.60, 0.70, 0.80, round(AUTO_BLOCK, 2)]
-        )
-    )
+    thresholds = sorted(set([
+        0.20, 0.30, round(float(MANUAL_REVIEW), 2),
+        0.50, 0.60, 0.70, 0.80, round(float(AUTO_BLOCK), 2)
+    ]))
     rows = []
     for t in thresholds:
         yp = (scores_filt >= t).astype(int)
@@ -524,39 +532,36 @@ elif page == "Model Performance":
         t_pre = t_tp / (t_tp + t_fp) if (t_tp + t_fp) > 0 else 0
         t_cost = t_fn * FN_COST + t_fp * FP_COST
         marker = " *" if abs(t - risk_threshold) < 0.005 else ""
-        rows.append(
-            {
-                "Threshold": f"{t:.2f}{marker}",
-                "Recall": f"{t_rec:.1%}",
-                "Precision": f"{t_pre:.1%}",
-                "True Positives": f"{t_tp:,}",
-                "False Positives": f"{t_fp:,}",
-                "Missed Frauds": f"{t_fn:,}",
-                "Total Cost": f"${t_cost:,.0f}",
-            }
-        )
+        rows.append({
+            "Threshold": f"{t:.2f}{marker}",
+            "Recall": f"{t_rec:.1%}",
+            "Precision": f"{t_pre:.1%}",
+            "True Positives": f"{t_tp:,}",
+            "False Positives": f"{t_fp:,}",
+            "Missed Frauds": f"{t_fn:,}",
+            "Total Cost": f"${t_cost:,.0f}",
+        })
     st.caption("* = current threshold")
-    st.dataframe(
-        pd.DataFrame(rows), width="stretch", hide_index=True,
-    )
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
     render_footer()
 
 
-# ── TAB 3: Case Study Explorer ──────────────────────────────────────
-elif page == "Case Study Explorer":
+# =====================================================================
+# TAB 3 - Case Study Explorer
+# =====================================================================
+with tab3:
     st.header("Case Study Explorer")
     st.caption(
-        "Detailed analysis of individual transaction decisions "
-        "with SHAP explanations"
+        "Detailed SHAP analysis of individual transaction decisions. "
+        "Each case shows why the model scored the transaction, with a "
+        "waterfall plot and plain-English explanation."
     )
 
-    # Case study definitions (from Phase 4 SHAP analysis)
     cases = {
         "Case 1: True Positive -- Clear Fraud Caught": {
-            "score": 0.9094,
-            "actual": "FRAUD",
-            "decision": "AUTO-BLOCK",
+            "score": 0.9094, "actual": "FRAUD", "decision": "AUTO-BLOCK",
+            "waterfall_file": "shap_waterfall_case1.png",
             "features": {
                 "Transaction Amount": "$17.52",
                 "Time of Day": "6:00 AM",
@@ -564,26 +569,24 @@ elif page == "Case Study Explorer":
                 "Transactions (24 hours)": "9",
                 "Weekend": "Yes",
                 "Spending Anomaly": "-0.39 std devs",
-                "First Transaction": "No",
+                "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "This transaction was correctly identified as fraud. "
-                "Multiple strong indicators were present: high daily "
-                "velocity (9 transactions in 24 hours), weekend timing, "
-                "and a small transaction amount typical of card-testing "
-                "behaviour. The model automatically blocked this "
-                "transaction, preventing potential fraud loss."
+                "This transaction was correctly identified as fraud. Multiple "
+                "strong indicators were present: high daily velocity (9 "
+                "transactions in 24 hours), weekend early-morning timing, and "
+                "a small amount typical of card-testing behaviour. The model "
+                "automatically blocked this transaction, preventing the loss."
             ),
             "drivers": [
                 "High 24-hour velocity (9 transactions)",
-                "Weekend + early morning timing",
+                "Weekend + early morning (6 AM) timing",
                 "Small amount consistent with card testing",
             ],
         },
         "Case 2: True Positive -- Velocity-Driven Detection": {
-            "score": 0.7332,
-            "actual": "FRAUD",
-            "decision": "MANUAL REVIEW",
+            "score": 0.7332, "actual": "FRAUD", "decision": "MANUAL REVIEW",
+            "waterfall_file": "shap_waterfall_case2.png",
             "features": {
                 "Transaction Amount": "$59.64",
                 "Time of Day": "4:00 AM",
@@ -591,26 +594,23 @@ elif page == "Case Study Explorer":
                 "Transactions (24 hours)": "3",
                 "Weekend": "No",
                 "Spending Anomaly": "+0.54 std devs",
-                "First Transaction": "No",
+                "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "This fraud was detected primarily through velocity "
-                "signals. The combination of elevated 24-hour velocity, "
-                "early morning timing, and above-average spending "
-                "deviation pushed the score into the manual review zone. "
-                "An analyst would confirm this as fraud based on the "
-                "pattern."
+                "This fraud was detected primarily through velocity signals. "
+                "The combination of elevated 24-hour velocity, 4 AM timing, "
+                "and above-average spending deviation pushed the score into "
+                "the manual review zone. An analyst would confirm this as fraud."
             ),
             "drivers": [
-                "Velocity features elevated",
+                "Velocity features elevated (3 txns in 24 hrs)",
                 "4 AM transaction time",
-                "Above-average spending deviation",
+                "Above-average spending deviation (+0.54 std devs)",
             ],
         },
         "Case 3: False Negative -- Missed Fraud": {
-            "score": 0.0853,
-            "actual": "FRAUD",
-            "decision": "AUTO-APPROVE",
+            "score": 0.0853, "actual": "FRAUD", "decision": "AUTO-APPROVE",
+            "waterfall_file": "shap_waterfall_case3.png",
             "features": {
                 "Transaction Amount": "$57.95",
                 "Time of Day": "Business hours",
@@ -618,20 +618,19 @@ elif page == "Case Study Explorer":
                 "Transactions (24 hours)": "0",
                 "Weekend": "No",
                 "Spending Anomaly": "-1.50 std devs",
-                "First Transaction": "Yes",
+                "First Transaction": "Yes (new client)",
             },
             "explanation": (
-                "The model failed to detect this fraud because all "
-                "behavioural features appeared normal. The transaction "
-                "had zero velocity (isolated event), a moderate amount, "
-                "and occurred during business hours. This represents a "
-                "model limitation: sophisticated fraudsters who pace "
+                "The model failed to detect this fraud because all behavioural "
+                "features appeared normal. Zero velocity, moderate amount, and "
+                "business-hours timing produced no warning signals. This is a "
+                "model limitation: sophisticated fraudsters who isolate "
                 "transactions can evade velocity-based detection."
             ),
             "drivers": [
-                "Zero velocity (no pattern to detect)",
+                "Zero velocity (no burst pattern to detect)",
                 "Normal business hours",
-                "First transaction (no history)",
+                "First transaction (no client history)",
             ],
             "improvement": (
                 "Consider adding merchant-category features and device "
@@ -639,9 +638,8 @@ elif page == "Case Study Explorer":
             ),
         },
         "Case 4: False Positive -- Legitimate Flagged": {
-            "score": 0.9342,
-            "actual": "LEGITIMATE",
-            "decision": "AUTO-BLOCK",
+            "score": 0.9342, "actual": "LEGITIMATE", "decision": "AUTO-BLOCK",
+            "waterfall_file": "shap_waterfall_case4.png",
             "features": {
                 "Transaction Amount": "$15.00",
                 "Time of Day": "9:00 AM",
@@ -649,15 +647,14 @@ elif page == "Case Study Explorer":
                 "Transactions (24 hours)": "2",
                 "Weekend": "Yes",
                 "Spending Anomaly": "-0.26 std devs",
-                "First Transaction": "No",
+                "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "This legitimate transaction was incorrectly blocked. "
-                "The model was triggered by the combination of weekend "
-                "timing, low amount (similar to card-testing), and "
-                "moderate velocity. This false positive demonstrates "
-                "why human review and dispute resolution processes are "
-                "essential."
+                "This legitimate transaction was incorrectly blocked. Weekend "
+                "timing, low amount (similar to card-testing), and moderate "
+                "velocity combined to trigger the model. This case demonstrates "
+                "why dispute resolution processes are essential alongside "
+                "automated blocking."
             ),
             "drivers": [
                 "Weekend + morning timing",
@@ -666,9 +663,8 @@ elif page == "Case Study Explorer":
             ],
         },
         "Case 5: Auto-Block Candidate -- High Confidence": {
-            "score": 0.9342,
-            "actual": "LEGITIMATE",
-            "decision": "AUTO-BLOCK",
+            "score": 0.9342, "actual": "LEGITIMATE", "decision": "AUTO-BLOCK",
+            "waterfall_file": "shap_waterfall_case5.png",
             "features": {
                 "Transaction Amount": "$15.00",
                 "Time of Day": "9:00 AM",
@@ -676,27 +672,24 @@ elif page == "Case Study Explorer":
                 "Transactions (24 hours)": "2",
                 "Weekend": "Yes",
                 "Spending Anomaly": "-0.26 std devs",
-                "First Transaction": "No",
+                "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "This case illustrates the risk of auto-blocking: a "
-                "high-confidence score (0.93) on a legitimate "
-                "transaction. While rare, auto-block false positives "
-                "highlight the need for rapid dispute resolution and "
-                "continuous model monitoring. The SHAP explanation "
-                "provides the audit trail needed for customer "
-                "communication."
+                "High-confidence false alarm (score 0.93) illustrating the risk "
+                "of auto-blocking. While rare, these cases highlight the need "
+                "for rapid dispute resolution and continuous model monitoring. "
+                "The SHAP explanation provides the audit trail needed for "
+                "customer communication."
             ),
             "drivers": [
                 "Score exceeded auto-block threshold (0.90)",
                 "Pattern matched card-testing signature",
-                "Demonstrates need for dispute resolution workflow",
+                "Demonstrates need for rapid dispute resolution workflow",
             ],
         },
         "Case 6: Borderline -- Near Review Threshold": {
-            "score": 0.3648,
-            "actual": "LEGITIMATE",
-            "decision": "AUTO-APPROVE",
+            "score": 0.3648, "actual": "LEGITIMATE", "decision": "AUTO-APPROVE",
+            "waterfall_file": "shap_waterfall_case6.png",
             "features": {
                 "Transaction Amount": "$125.00",
                 "Time of Day": "Afternoon",
@@ -704,38 +697,32 @@ elif page == "Case Study Explorer":
                 "Transactions (24 hours)": "0",
                 "Weekend": "No",
                 "Spending Anomaly": "Normal",
-                "First Transaction": "No",
+                "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "This borderline case scored just below the manual "
-                "review threshold (0.41). The transaction had no "
-                "velocity flags and a reasonable amount. The model "
-                "correctly approved it, but the score shows it was "
-                "not far from the review zone. Small changes in "
-                "behaviour could tip similar transactions into review."
+                "This borderline case scored just below the manual review "
+                "threshold (0.42). No velocity flags and a reasonable amount "
+                "led to approval. Small behaviour changes in velocity or amount "
+                "could tip similar transactions into the review zone."
             ),
             "drivers": [
-                "Score near but below threshold (0.36 vs 0.41)",
+                "Score near but below threshold (0.36 vs 0.42)",
                 "No velocity anomalies",
                 "Normal transaction pattern with slight uncertainty",
             ],
         },
     }
 
-    selected = st.selectbox(
-        "Select a case study to analyse:", list(cases.keys()),
-    )
+    selected = st.selectbox("Select a case study to analyse:", list(cases.keys()))
     case = cases[selected]
 
     st.markdown("---")
 
-    # KPI row for selected case
     m1, m2, m3 = st.columns(3)
     m1.metric("Fraud Score", f"{case['score']:.4f}")
     m2.metric("Model Decision", case["decision"])
     m3.metric("Actual Outcome", case["actual"])
 
-    # Feature details
     st.subheader("Transaction Features")
     feat_items = list(case["features"].items())
     mid = (len(feat_items) + 1) // 2
@@ -747,25 +734,30 @@ elif page == "Case Study Explorer":
         for k, v in feat_items[mid:]:
             st.markdown(f"**{k}:** {v}")
 
-    # SHAP waterfall plot
-    st.subheader("SHAP Explanation")
-    waterfall = FIGURES_PATH / "shap_waterfall_cases.png"
-    if waterfall.exists():
+    # Individual waterfall plot for the selected case
+    st.subheader("SHAP Explanation -- Why the Model Made This Decision")
+    wf_file = FIGURES_PATH / case["waterfall_file"]
+    if wf_file.exists():
         st.image(
-            Image.open(waterfall),
-            caption=(
-                "SHAP waterfall plots for all 6 case studies "
-                "(from Phase 4 analysis)"
-            ),
-            width="stretch",
+            Image.open(wf_file),
+            caption=f"SHAP waterfall: {selected.split(' --')[0]}",
+            use_container_width=True,
         )
     else:
-        st.info(
-            "SHAP waterfall plot not available. "
-            "Run notebook 04_shap_explainability.ipynb first."
-        )
+        combined = FIGURES_PATH / "shap_waterfall_cases.png"
+        if combined.exists():
+            st.info(
+                f"Individual plot ({case['waterfall_file']}) not found. "
+                "Showing combined grid. Re-run notebook 04 cell 13 to generate "
+                "individual files."
+            )
+            st.image(Image.open(combined), use_container_width=True)
+        else:
+            st.info(
+                "SHAP waterfall plots not found. "
+                "Run notebook 04_shap_explainability.ipynb first."
+            )
 
-    # Plain-English explanation
     st.subheader("Model Decision Explanation")
     st.write(case["explanation"])
 
@@ -780,15 +772,185 @@ elif page == "Case Study Explorer":
     render_footer()
 
 
-# ── TAB 4: Regulatory Compliance ────────────────────────────────────
-elif page == "Regulatory Compliance":
-    st.header("Regulatory Compliance")
+# =====================================================================
+# TAB 4 - Client Risk Profile
+# =====================================================================
+with tab4:
+    st.header("Client Risk Profile")
     st.caption(
-        "Model governance, fair lending review, and audit readiness"
+        "Per-client transaction history and fraud risk assessment. "
+        "A client is identified by the combination of card number, "
+        "billing address, and email domain."
     )
 
-    # SR 11-7 Checklist
-    st.subheader("SR 11-7 Model Documentation Checklist")
+    df_scored, client_stats = build_client_data(df_test, fraud_scores)
+
+    # Filter controls
+    cf1, cf2 = st.columns([2, 1])
+    with cf1:
+        min_risk = st.slider(
+            "Minimum risk score for client list",
+            min_value=0.0, max_value=1.0,
+            value=float(round(float(AUTO_BLOCK), 2)),
+            step=0.01,
+            help=(
+                "Show only clients who have at least one transaction "
+                "at or above this fraud score."
+            ),
+            key="client_min_risk",
+        )
+    with cf2:
+        sort_by = st.selectbox(
+            "Sort clients by",
+            ["Max Score (High to Low)", "Transaction Count", "Fraud Transactions"],
+            key="client_sort",
+        )
+
+    # Filter and sort
+    flagged_clients = client_stats[client_stats['max_score'] >= min_risk].copy()
+    if sort_by == "Max Score (High to Low)":
+        flagged_clients = flagged_clients.sort_values('max_score', ascending=False)
+    elif sort_by == "Transaction Count":
+        flagged_clients = flagged_clients.sort_values('txn_count', ascending=False)
+    else:
+        flagged_clients = flagged_clients.sort_values('fraud_txns', ascending=False)
+
+    if flagged_clients.empty:
+        st.warning(
+            f"No clients found with max risk score >= {min_risk:.2f}. "
+            "Lower the minimum risk score."
+        )
+    else:
+        st.caption(
+            f"{len(flagged_clients):,} clients match the current filter "
+            f"(out of {len(client_stats):,} total clients in test set)."
+        )
+
+        flagged_clients = flagged_clients.reset_index(drop=True)
+        flagged_clients['label'] = [
+            (
+                f"Client #{i+1:04d}  |  "
+                f"max score: {row['max_score']:.3f}  |  "
+                f"{int(row['txn_count'])} txns  |  "
+                f"{int(row['fraud_txns'])} confirmed fraud"
+            )
+            for i, row in flagged_clients.iterrows()
+        ]
+
+        selected_label = st.selectbox(
+            "Select a client to investigate:",
+            flagged_clients['label'].tolist(),
+            key="client_select",
+        )
+        selected_row = flagged_clients[flagged_clients['label'] == selected_label].iloc[0]
+        selected_client_id = selected_row['client_id']
+
+        st.markdown("---")
+
+        s1, s2, s3, s4 = st.columns(4)
+        s1.metric("Total Transactions", f"{int(selected_row['txn_count']):,}")
+        s2.metric("Max Fraud Score", f"{selected_row['max_score']:.4f}")
+        s3.metric("Confirmed Fraud Txns", f"{int(selected_row['fraud_txns'])}")
+        s4.metric("Total Amount", f"${selected_row['total_amount']:,.2f}")
+
+        max_s = float(selected_row['max_score'])
+        if max_s >= float(AUTO_BLOCK):
+            risk_label = "HIGH RISK -- Auto-Block triggered"
+            risk_color = "#c62828"
+        elif max_s >= float(MANUAL_REVIEW):
+            risk_label = "MEDIUM RISK -- Manual Review flagged"
+            risk_color = "#e65100"
+        else:
+            risk_label = "LOW RISK"
+            risk_color = "#2e7d32"
+
+        st.markdown(
+            f"<div style='background:{risk_color};color:white;padding:8px 16px;"
+            f"border-radius:6px;font-weight:bold;display:inline-block;margin:8px 0'>"
+            f"Overall Risk Level: {risk_label}</div>",
+            unsafe_allow_html=True,
+        )
+
+        st.markdown("---")
+
+        st.subheader("Transaction History")
+        client_txns = df_scored[
+            df_scored['client_id'] == selected_client_id
+        ].copy().sort_values('TransactionDT')
+        client_txns['#'] = range(1, len(client_txns) + 1)
+        client_txns['Decision'] = client_txns['fraud_score'].apply(
+            lambda s: 'Auto-Block' if s >= float(AUTO_BLOCK)
+            else ('Manual Review' if s >= float(MANUAL_REVIEW) else 'Approved')
+        )
+        client_txns['Actual'] = client_txns['isFraud'].map({1: 'FRAUD', 0: 'Legitimate'})
+
+        st.dataframe(
+            client_txns[['#', 'TransactionAmt', 'fraud_score', 'Decision', 'Actual']].rename(
+                columns={'TransactionAmt': 'Amount ($)', 'fraud_score': 'Fraud Score'}
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.subheader("Fraud Score by Transaction")
+        fig, ax = plt.subplots(figsize=(10, 4))
+        bar_colors = [
+            '#c62828' if s >= float(AUTO_BLOCK)
+            else ('#e65100' if s >= float(MANUAL_REVIEW) else '#1565C0')
+            for s in client_txns['fraud_score']
+        ]
+        ax.bar(client_txns['#'], client_txns['fraud_score'], color=bar_colors)
+        ax.axhline(
+            y=float(AUTO_BLOCK), color='#c62828', linestyle='--',
+            linewidth=1.5, label=f'Auto-Block ({float(AUTO_BLOCK):.2f})',
+        )
+        ax.axhline(
+            y=float(MANUAL_REVIEW), color='#e65100', linestyle='--',
+            linewidth=1.5, label=f'Manual Review ({float(MANUAL_REVIEW):.2f})',
+        )
+        ax.set_xlabel("Transaction #", fontsize=11)
+        ax.set_ylabel("Fraud Score", fontsize=11)
+        ax.set_title(
+            f"Fraud Scores for Selected Client ({len(client_txns)} transactions)",
+            fontsize=13, fontweight="bold",
+        )
+        ax.set_ylim(0, 1.05)
+        ax.legend(fontsize=9)
+        ax.grid(axis='y', alpha=0.3)
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close()
+
+        st.info(
+            "Note: fraud scores are computed from pre-engineered features "
+            "(velocity counts, spending deviation) derived from the full test "
+            "dataset. In a production system these features would be computed "
+            "in real time from a streaming transaction database."
+        )
+
+    render_footer()
+
+
+# =====================================================================
+# TAB 5 - Regulatory Compliance
+# =====================================================================
+with tab5:
+    st.header("Regulatory Compliance", anchor="compliance-top")
+    st.caption("Model governance, fair lending review, and audit readiness")
+
+    st.markdown("""
+<div class="toc-box">
+<strong>Table of Contents</strong><br><br>
+&nbsp;&nbsp;1. <a href="#sr-11-7-checklist">SR 11-7 Model Documentation Checklist</a><br>
+&nbsp;&nbsp;2. <a href="#fair-lending-review">Fair Lending Considerations</a><br>
+&nbsp;&nbsp;3. <a href="#model-governance-framework">Model Governance Framework</a><br>
+&nbsp;&nbsp;4. <a href="#right-to-explanation">Right-to-Explanation Capabilities</a><br>
+&nbsp;&nbsp;5. <a href="#data-lineage-audit-trail">Data Lineage and Audit Trail</a>
+</div>
+""", unsafe_allow_html=True)
+
+    # ── Section 1: SR 11-7 ───────────────────────────────────────────
+    st.subheader("1. SR 11-7 Model Documentation Checklist", anchor="sr-11-7-checklist")
 
     done_items = [
         "Model documentation (purpose, inputs, outputs, assumptions)",
@@ -817,181 +979,157 @@ elif page == "Regulatory Compliance":
         for item in pending_items:
             st.checkbox(item, value=False, disabled=True, key=f"p_{item}")
 
+    st.markdown("[Back to top](#compliance-top)")
     st.markdown("---")
 
-    # Fair Lending
-    st.subheader("Fair Lending Considerations")
+    # ── Section 2: Fair Lending ───────────────────────────────────────
+    st.subheader("2. Fair Lending Considerations", anchor="fair-lending-review")
 
-    fl_data = pd.DataFrame(
-        [
-            {
-                "Feature": "Transaction Velocity (1hr, 24hr)",
-                "Risk Level": "LOW",
-                "Assessment": (
-                    "Behavioural pattern. Monitor for disparate "
-                    "impact across segments."
-                ),
-            },
-            {
-                "Feature": "Spending Anomaly Score",
-                "Risk Level": "LOW",
-                "Assessment": (
-                    "Self-norming (deviation from client's own "
-                    "history)."
-                ),
-            },
-            {
-                "Feature": "First-Time Transaction",
-                "Risk Level": "MEDIUM",
-                "Assessment": (
-                    "New customers disproportionately flagged. "
-                    "Monitor approval rates."
-                ),
-            },
-            {
-                "Feature": "Time of Day / Weekend",
-                "Risk Level": "MEDIUM",
-                "Assessment": (
-                    "Shift workers and time zones may be affected. "
-                    "Monitor FPR by region."
-                ),
-            },
-            {
-                "Feature": "Transaction Amount",
-                "Risk Level": "LOW-MEDIUM",
-                "Assessment": (
-                    "Spending power correlates with income. "
-                    "Monitor across segments."
-                ),
-            },
-        ]
-    )
-    st.dataframe(
-        fl_data, width="stretch", hide_index=True,
-    )
+    fl_data = pd.DataFrame([
+        {
+            "Feature": "Transaction Velocity (1hr, 24hr)",
+            "Risk Level": "LOW",
+            "Assessment": (
+                "Behavioural pattern. Monitor for disparate "
+                "impact across segments."
+            ),
+        },
+        {
+            "Feature": "Spending Anomaly Score",
+            "Risk Level": "LOW",
+            "Assessment": (
+                "Self-norming (deviation from the client's own history). "
+                "No cross-client comparison."
+            ),
+        },
+        {
+            "Feature": "First-Time Transaction",
+            "Risk Level": "MEDIUM",
+            "Assessment": (
+                "Returning clients (3.67% fraud rate) are riskier than "
+                "first-time clients (2.53%). Monitor approval rates for "
+                "new customers to avoid disparate impact."
+            ),
+        },
+        {
+            "Feature": "Time of Day / Weekend",
+            "Risk Level": "MEDIUM",
+            "Assessment": (
+                "Shift workers and different time zones may be "
+                "disproportionately affected. Monitor FPR by region."
+            ),
+        },
+        {
+            "Feature": "Transaction Amount",
+            "Risk Level": "LOW-MEDIUM",
+            "Assessment": (
+                "Spending power may correlate with income. "
+                "Monitor across customer segments."
+            ),
+        },
+    ])
+    st.dataframe(fl_data, use_container_width=True, hide_index=True)
     st.markdown(
         "**Overall Assessment:** No direct protected attributes used. "
-        "Conduct disparate impact analysis when demographic data "
-        "becomes available."
+        "Conduct disparate impact analysis when demographic data becomes available."
     )
 
+    st.markdown("[Back to top](#compliance-top)")
     st.markdown("---")
 
-    # Model Governance
-    st.subheader("Model Governance Framework")
+    # ── Section 3: Model Governance ──────────────────────────────────
+    st.subheader("3. Model Governance Framework", anchor="model-governance-framework")
 
     gov1, gov2 = st.columns(2)
-
     with gov1:
         st.markdown("**Model Identification**")
-        st.text("Name:     Agent Fraud Sentinel (XGBoost)")
+        st.text("Name:     Agent Fraud Sentinel (LightGBM)")
         st.text("Version:  1.0")
         st.text("Type:     Gradient Boosted Decision Tree")
         st.text("Purpose:  Real-time fraud detection")
         st.text("Date:     February 2026")
-        st.text("")
+        st.markdown("")
         st.markdown("**Monitoring Schedule**")
-        sched = pd.DataFrame(
-            [
-                {
-                    "Frequency": "Daily",
-                    "Activity": (
-                        "Alert volume, auto-block count, queue size"
-                    ),
-                },
-                {
-                    "Frequency": "Weekly",
-                    "Activity": (
-                        "Recall, precision, FPR by risk tier"
-                    ),
-                },
-                {
-                    "Frequency": "Monthly",
-                    "Activity": (
-                        "SHAP drift analysis, feature stability"
-                    ),
-                },
-                {
-                    "Frequency": "Quarterly",
-                    "Activity": (
-                        "Full revalidation, threshold recalibration"
-                    ),
-                },
-                {
-                    "Frequency": "Annual",
-                    "Activity": "Comprehensive SR 11-7 review",
-                },
-            ]
-        )
-        st.dataframe(
-            sched, width="stretch", hide_index=True,
-        )
+        sched = pd.DataFrame([
+            {"Frequency": "Daily",
+             "Activity": "Alert volume, auto-block count, queue size"},
+            {"Frequency": "Weekly",
+             "Activity": "Recall, precision, FPR by risk tier"},
+            {"Frequency": "Monthly",
+             "Activity": "SHAP drift analysis, feature stability"},
+            {"Frequency": "Quarterly",
+             "Activity": "Full revalidation, threshold recalibration"},
+            {"Frequency": "Annual",
+             "Activity": "Comprehensive SR 11-7 review"},
+        ])
+        st.dataframe(sched, use_container_width=True, hide_index=True)
 
     with gov2:
         st.markdown("**Model Risk Classification**")
         st.text("Recommended Tier:  Tier 2")
         st.text("Rationale:         Material financial impact")
         st.text("Review Cycle:      Quarterly")
-        st.text("")
+        st.markdown("")
         st.markdown("**Key Assumptions**")
         st.markdown(
             "1. Training fraud patterns represent future fraud\n"
             "2. Temporal ordering preserved (no data leakage)\n"
             "3. Client identity: card1 + addr1 + P_emaildomain\n"
-            "4. Cost ratio 7.5:1 ($75 FN, $10 FP)\n"
+            "4. Cost ratio 22.7:1 ($227 FN, $10 FP)\n"
             "5. Minimum 75% recall target"
         )
 
+    st.markdown("[Back to top](#compliance-top)")
     st.markdown("---")
 
-    # Right to Explanation
-    st.subheader("Right-to-Explanation Capabilities")
+    # ── Section 4: Right to Explanation ──────────────────────────────
+    st.subheader("4. Right-to-Explanation Capabilities", anchor="right-to-explanation")
 
     st.markdown(
-        "Customers whose transactions are blocked or flagged may "
-        "request an explanation. SHAP values provide a complete, "
-        "auditable explanation at the individual level.\n\n"
+        "Customers whose transactions are blocked or flagged may request an "
+        "explanation. SHAP values provide a complete, auditable explanation "
+        "at the individual transaction level.\n\n"
         "**For any transaction, the system can generate:**\n\n"
-        "1. **Feature-level attribution** -- which factors "
-        "contributed to the decision\n"
-        "2. **Quantified contribution** -- how much each factor "
-        "affected the score\n"
-        "3. **Comparison to baseline** -- score relative to average "
-        "fraud probability\n\n"
+        "1. **Feature-level attribution** -- which factors contributed to "
+        "the decision\n"
+        "2. **Quantified contribution** -- how much each factor affected "
+        "the score\n"
+        "3. **Comparison to baseline** -- score relative to average fraud "
+        "probability\n\n"
         "**Dispute Resolution Workflow:**\n\n"
-        "1. Customer contacts bank about blocked transaction\n"
+        "1. Customer contacts bank about a blocked transaction\n"
         "2. Analyst retrieves SHAP explanation from audit log\n"
         "3. Analyst reviews feature contributions in plain English\n"
-        "4. If false positive: approve transaction, note for model "
-        "feedback\n"
+        "4. If false positive: approve transaction, note for model feedback\n"
         "5. If true fraud: confirm block, initiate investigation"
     )
 
+    st.markdown("[Back to top](#compliance-top)")
     st.markdown("---")
 
-    # Data Lineage
-    st.subheader("Data Lineage and Audit Trail")
+    # ── Section 5: Data Lineage ───────────────────────────────────────
+    st.subheader("5. Data Lineage and Audit Trail", anchor="data-lineage-audit-trail")
 
     st.markdown(
         "**Data Source:** IEEE-CIS Fraud Detection Dataset "
         "(590,540 transactions)\n\n"
         "**Processing Pipeline:**\n\n"
         "1. Raw data ingestion (434 features)\n"
-        "2. Feature engineering: 7 behavioural features derived "
-        "from raw data\n"
-        "3. Temporal split: 60/20/20 "
-        "(train / validation / test)\n"
-        "4. Model training: XGBoost with cost-sensitive "
-        "optimization\n"
-        "5. Threshold calibration: cost-minimising with 75% "
-        "recall constraint\n"
-        "6. Explainability: SHAP TreeExplainer for all "
-        "predictions\n\n"
+        "2. Feature engineering: 7 behavioural features derived from raw "
+        "transaction data\n"
+        "3. Temporal split: 60/20/20 (train / validation / test, "
+        "chronological order)\n"
+        "4. Model training: LightGBM with Bayesian optimization (Optuna)\n"
+        "5. Threshold calibration: cost-minimising at $227 FN / $10 FP "
+        "with 75% recall floor\n"
+        "6. Explainability: SHAP TreeExplainer for all predictions\n\n"
         "**Audit Requirements:**\n\n"
         "- SHAP values stored at scoring time\n"
         "- Retention: minimum 7 years (regulatory requirement)\n"
-        "- Log fields: transaction_id, fraud_score, threshold, "
-        "decision, SHAP values, model_version, timestamp"
+        "- Log fields: transaction_id, fraud_score, threshold, decision, "
+        "SHAP values, model_version, timestamp"
     )
+
+    st.markdown("[Back to top](#compliance-top)")
 
     render_footer()

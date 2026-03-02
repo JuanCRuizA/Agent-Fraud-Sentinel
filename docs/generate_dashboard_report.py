@@ -262,21 +262,21 @@ CH2_MATRIX = {
         "layout. Confusion matrix computed from (y_filt, y_pred_filt) where y_pred = "
         "(scores >= threshold).astype(int). Histogram: plt.hist() with density=True, "
         "alpha=0.6 for overlapping fraud/legitimate distributions. Cost computation: "
-        "missed_fraud = FN * $75, review_cost = FP * $10, savings = (total_fraud * $75) "
+        "missed_fraud = FN * $227, review_cost = FP * $10, savings = (total_fraud * $227) "
         "- missed_fraud. All recomputed on every threshold/sample change."
     ),
     (2, 1): (
         "Four KPI cards are displayed side by side using Streamlit's column layout. "
         "The histogram overlaps fraud scores (red) and legitimate scores (blue) to "
         "show how well the model separates them. A vertical line marks the current "
-        "threshold. Cost calculations use the established ratios: $75 per missed fraud, "
+        "threshold. Cost calculations use the established ratios: $227 per missed fraud, "
         "$10 per false alarm. Everything recalculates when the slider moves."
     ),
     (2, 2): (
         "Four number boxes sit side by side at the top. Below them, a chart shows "
         "how fraud (red) and honest (blue) transactions are distributed, with a "
         "line showing where the alarm is set. The cost section multiplies missed "
-        "frauds by $75 and false alarms by $10 to get the total cost."
+        "frauds by $227 and false alarms by $10 to get the total cost."
     ),
     (3, 0): (
         "Interactive executive dashboard that enables data-driven threshold selection. "
@@ -300,7 +300,7 @@ CH2_MATRIX = {
 CH3_MATRIX = {
     (0, 0): (
         "Built Model Performance tab with: confusion matrix heatmap with cost overlay "
-        "(TN=$0, FP=count\u00d7$10, FN=count\u00d7$75, TP='Prevented'), ROC curve with "
+        "(TN=$0, FP=count\u00d7$10, FN=count\u00d7$227, TP='Prevented'), ROC curve with "
         "operating point marker and AUC, Precision-Recall curve with baseline and "
         "operating point, SHAP feature importance bar chart (loaded from Phase 4 PNG), "
         "and cost-benefit table across 8 threshold values (0.20 to 0.90) showing recall, "

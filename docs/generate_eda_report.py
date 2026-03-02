@@ -44,15 +44,15 @@ CH0_MATRIX = {
     (0, 0): "Performed exploratory data analysis on 590,540 IEEE-CIS transactions (434 features) using pandas, matplotlib, and seaborn. Computed correlations, missingness profiles, distributional statistics, and temporal patterns across 32 notebook cells.",
     (0, 1): "Conducted a comprehensive diagnostic of the bank's transaction data to understand where fraud hides, how much data is usable, and what patterns distinguish fraudulent from legitimate transactions.",
     (0, 2): "We looked at about 590,000 bank transactions to find clues about which ones might be fraud. We checked what the data looks like, what's missing, and when fraud tends to happen.",
-    (1, 0): "To identify discriminative features, quantify class imbalance (3.50%, 1:27 ratio), assess data quality (214/434 features >50% missing), and establish cost assumptions (FN=$75, FP=$10) before feature engineering and modeling.",
+    (1, 0): "To identify discriminative features, quantify class imbalance (3.50%, 1:27 ratio), assess data quality (214/434 features >50% missing), and establish cost assumptions (FN=$227, FP=$10) before feature engineering and modeling.",
     (1, 1): "Because building a fraud detection system without understanding the data is like building a house without surveying the land. The bank needs to know the fraud rate, data gaps, and cost of errors before investing in a model.",
     (1, 2): "Because you can't catch thieves if you don't first understand how they behave. We needed to learn the patterns before building the alarm system.",
     (2, 0): "Left-joined transaction (590K x 394) and identity (144K x 41) tables on TransactionID. Computed absolute Pearson correlations with isFraud, profiled missing values per column, plotted log-transformed amount distributions, and extracted hour/day-of-week from TransactionDT (seconds since epoch, base date 2017-12-01).",
     (2, 1): "Merged two data files into a single view, ranked all 434 features by their connection to fraud, mapped data quality gaps, compared dollar amounts between fraud and legitimate transactions, and analyzed what times and days fraud peaks.",
     (2, 2): "We combined two spreadsheets into one big table, then sorted through all 434 columns to find which ones are most connected to fraud. We also checked which hours and days have the most fraud.",
-    (3, 0): "Quantified inputs for scale_pos_weight (28.56), identified that top correlated features (V-series) have 76-78% missing data (ruling them out as direct model inputs), and established the 7.5:1 cost ratio that drives threshold optimization in Phase 3.",
-    (3, 1): "The bank now knows: (1) fraud is 3.5% of transactions (manageable but costly), (2) half the data columns are unreliable, (3) early mornings and weekends are high-risk, and (4) missing one fraud costs 7.5x more than a false alarm.",
-    (3, 2): "The bank learns when to be extra careful (early mornings, weekends), that a missed fraud costs $75 but checking a good transaction only costs $10, and that the data needs cleaning before it can be useful.",
+    (3, 0): "Quantified inputs for scale_pos_weight (28.56), identified that top correlated features (V-series) have 76-78% missing data (ruling them out as direct model inputs), and established the 22.7:1 cost ratio that drives threshold optimization in Phase 3.",
+    (3, 1): "The bank now knows: (1) fraud is 3.5% of transactions (manageable but costly), (2) half the data columns are unreliable, (3) early mornings and weekends are high-risk, and (4) missing one fraud costs 22.7x more than a false alarm.",
+    (3, 2): "The bank learns when to be extra careful (early mornings, weekends), that a missed fraud costs $227 but checking a good transaction only costs $10, and that the data needs cleaning before it can be useful.",
 }
 
 CH1_MATRIX = {
@@ -116,17 +116,17 @@ CH4_MATRIX = {
 }
 
 CH5_MATRIX = {
-    (0, 0): "Established cost parameters: FN=$75.00 (median fraud TransactionAmt), FP=$10.00 (industry benchmark for manual review), ratio 7.5:1. Chose median over mean ($149.24) because mean is skewed by outliers (max $5,191). Created summary statistics table (10 key metrics). Saved top_features.csv for Phase 2 traceability.",
-    (0, 1): "Defined the financial consequences of each type of error. Missing a fraud costs the bank $75 on average. Flagging a legitimate transaction for review costs $10 in analyst time. These numbers drive every decision about how aggressive the fraud system should be.",
-    (0, 2): "We figured out the 'price' of mistakes. Missing a fraud costs about $75 (the money the thief takes). Checking a good transaction by mistake costs about $10 (the employee's time). So missing a fraud is about 7.5 times worse than a false alarm.",
-    (1, 0): "Standard ML metrics (accuracy, F1) assign equal weight to FP and FN errors, which misrepresents business reality. The 7.5:1 asymmetry informs: (1) scale_pos_weight in XGBoost, (2) cost-weighted threshold optimization in Phase 3, and (3) the business case for a high-recall operating point.",
-    (1, 1): "Because not all mistakes are equal. A bank that misses fraud loses money AND customer trust. A bank that over-flags transactions annoys customers but at a much lower cost. The 7.5:1 ratio quantifies this imbalance so every subsequent decision is grounded in financial reality.",
-    (1, 2): "Because missing a thief is much worse than bothering an honest customer. If we treat both mistakes the same, the system would be lazy about catching thieves. The 7.5:1 ratio tells the system: 'catching thieves matters 7.5 times more.'",
-    (2, 0): "Median via df[df['isFraud']==1]['TransactionAmt'].median() = $75.00. Mean rejected due to right-skew (mean/median ratio = 1.99). FP cost from industry benchmarks (analyst time + customer friction). Cost function: total_cost = FN_count * 75 + FP_count * 10. Top features saved via pd.DataFrame.to_csv().",
+    (0, 0): "Established cost parameters: FN=$227.00 (full economic cost: transaction loss $75 + chargeback $27 + ops $50 + reputational $75), FP=$10.00 (industry benchmark for manual review), ratio 22.7:1. The median fraud TransactionAmt ($75.00) is the starting point; total economic impact reaches $227. Created summary statistics table (10 key metrics). Saved top_features.csv for Phase 2 traceability.",
+    (0, 1): "Defined the financial consequences of each type of error. Missing a fraud costs the bank $227 in total economic impact (transaction loss, chargeback fees, investigation, and reputational damage). Flagging a legitimate transaction for review costs $10 in analyst time. These numbers drive every decision about how aggressive the fraud system should be.",
+    (0, 2): "We figured out the 'price' of mistakes. Missing a fraud costs about $227 (the money lost plus bank costs). Checking a good transaction by mistake costs about $10 (the employee's time). So missing a fraud is about 22.7 times worse than a false alarm.",
+    (1, 0): "Standard ML metrics (accuracy, F1) assign equal weight to FP and FN errors, which misrepresents business reality. The 22.7:1 asymmetry informs: (1) scale_pos_weight in XGBoost, (2) cost-weighted threshold optimization in Phase 3, and (3) the business case for a high-recall operating point.",
+    (1, 1): "Because not all mistakes are equal. A bank that misses fraud loses money AND customer trust. A bank that over-flags transactions annoys customers but at a much lower cost. The 22.7:1 ratio quantifies this imbalance so every subsequent decision is grounded in financial reality.",
+    (1, 2): "Because missing a thief is much worse than bothering an honest customer. If we treat both mistakes the same, the system would be lazy about catching thieves. The 22.7:1 ratio tells the system: 'catching thieves matters 22.7 times more.'",
+    (2, 0): "Median via df[df['isFraud']==1]['TransactionAmt'].median() = $75.00. Mean rejected due to right-skew (mean/median ratio = 1.99). FP cost from industry benchmarks (analyst time + customer friction). Cost function: total_cost = FN_count * 227 + FP_count * 10. Top features saved via pd.DataFrame.to_csv().",
     (2, 1): "The median was chosen over the average because a few very large frauds ($5,000+) would inflate the average and make the system overly cautious. The $10 review cost reflects the real cost of an analyst spending time on a false lead. Together, these form the scoring system for the model.",
     (2, 2): "We used the 'middle' fraud amount ($75) instead of the average ($149) because a few giant frauds would throw off the average. The $10 review cost is what it costs the bank in employee time to check a flagged transaction.",
     (3, 0): "The cost framework enables dollar-denominated model evaluation: Phase 3 reports total cost at each threshold, allowing direct comparison between a 'catch-everything' strategy ($598K at 76% recall) and a 'minimize-cost' strategy ($328K at 14% recall). This makes the precision-recall tradeoff tangible.",
-    (3, 1): "The bank gains a decision framework in dollars, not percentages. When the CEO asks 'how much does this model save us?', the team can answer in monetary terms. The 7.5:1 ratio also provides audit-ready documentation for regulators requiring cost-benefit justification.",
+    (3, 1): "The bank gains a decision framework in dollars, not percentages. When the CEO asks 'how much does this model save us?', the team can answer in monetary terms. The 22.7:1 ratio also provides audit-ready documentation for regulators requiring cost-benefit justification.",
     (3, 2): "The bank gets a simple rule for judging the system: 'What is the total cost of mistakes?' This lets everyone \u2014 from the boss to the regulator \u2014 understand whether the system is working, using real dollar amounts instead of confusing percentages.",
 }
 
@@ -234,16 +234,16 @@ ALL_CHAPTERS = [
         "subtitle": "Notebook Sections 8\u201310: Cost Assumptions, Key Findings, Summary Statistics",
         "narrative": (
             "The EDA concludes by translating analytical findings into a business decision "
-            "framework. Using the median fraud amount ($75) as the False Negative cost and "
-            "an industry-standard $10 for False Positive (manual review) cost, the analysis "
-            "establishes a 7.5:1 cost asymmetry. This ratio becomes the cornerstone of Phase 3 "
+            "framework. Establishing the False Negative cost at $227 (full economic impact: $75 transaction "
+            "loss + $27 chargeback + $50 investigation + $75 reputational damage) versus $10 for "
+            "False Positive (manual review), the analysis establishes a 22.7:1 cost asymmetry. This ratio becomes the cornerstone of Phase 3 "
             "threshold optimization, ensuring the model prioritizes catching fraud over "
             "minimizing false alarms."
         ),
         "matrix": CH5_MATRIX,
         "figures": [],
         "callouts": [
-            ("business", "The 7.5:1 cost ratio means the bank should tolerate up to 7.5 false alarms for every fraud it catches. This drives the model to a 76% recall operating point \u2014 catching 3 out of 4 frauds."),
+            ("business", "The 22.7:1 cost ratio means the bank should tolerate up to 22.7 false alarms for every fraud it catches. This drives the model to a 76% recall operating point \u2014 catching 3 out of 4 frauds."),
         ],
     },
 ]
@@ -260,9 +260,9 @@ SUMMARY_TABLE_DATA = [
     ("Avg Legitimate Amount ($)", "134.51"),
     ("Peak Fraud Hour", "7:00 AM"),
     ("Peak Fraud Day", "Friday"),
-    ("FN Cost (missed fraud)", "$75.00"),
+    ("FN Cost (missed fraud)", "$227.00"),
     ("FP Cost (false alarm)", "$10.00"),
-    ("Cost Ratio (FN:FP)", "7.5 : 1"),
+    ("Cost Ratio (FN:FP)", "22.7 : 1"),
 ]
 
 GLOSSARY = [
