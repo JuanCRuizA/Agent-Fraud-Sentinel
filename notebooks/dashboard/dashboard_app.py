@@ -220,9 +220,9 @@ with st.sidebar:
 
     st.subheader("Export")
     flagged_mask = fraud_scores >= risk_threshold
-    flagged_export = df_test[
-        ['TransactionID', 'TransactionAmt', 'client_id', 'isFraud']
-    ].copy()
+    export_cols = [c for c in ['TransactionID', 'client_id', 'TransactionAmt', 'isFraud']
+                   if c in df_test.columns]
+    flagged_export = df_test[export_cols].copy()
     flagged_export['fraud_score'] = fraud_scores
     flagged_export = flagged_export[flagged_mask]
     csv_data = flagged_export.to_csv(index=False)
@@ -296,9 +296,12 @@ with tab1:
     review_cost = fp * FP_COST
     total_cost = missed_fraud + review_cost
 
+    no_model = total_fraud * FN_COST
+    savings = no_model - missed_fraud
+
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Fraud Detected", f"{tp:,} / {total_fraud:,}", f"{recall:.1%} recall")
-    k2.metric("False Positive Rate", f"{fpr:.1%}", f"{fp:,} false alarms")
+    k1.metric("Fraud Savings vs No Model", f"${savings:,.0f}", f"${no_model:,.0f} baseline")
+    k2.metric("Fraud Detected", f"{tp:,} / {total_fraud:,}", f"{recall:.1%} recall")
     k3.metric("Fraud Prevented", f"${fraud_prevented:,.0f}", f"{tp:,} transactions blocked")
     k4.metric(
         "Total Operational Cost",
@@ -342,7 +345,9 @@ with tab1:
         ax.hist(scores_filt[y_filt == 1], bins=50, alpha=0.6,
                 color="#f44336", label="Fraud", density=True)
         ax.axvline(risk_threshold, color="#333", linestyle="--",
-                   linewidth=2, label=f"Threshold ({risk_threshold:.2f})")
+                   linewidth=2, label=f"Review ({risk_threshold:.2f})")
+        ax.axvline(float(AUTO_BLOCK), color="#c62828", linestyle="--",
+                   linewidth=1.5, label=f"Auto-Block ({float(AUTO_BLOCK):.2f})")
         ax.set_xlabel("Fraud Score", fontsize=12)
         ax.set_ylabel("Density", fontsize=12)
         ax.set_title("Distribution of Fraud Scores", fontsize=14, fontweight="bold")
@@ -364,12 +369,10 @@ with tab1:
         f"${review_cost:,.0f}",
         f"{fp:,} reviews x ${FP_COST:.0f}",
     )
-    no_model = total_fraud * FN_COST
-    savings = no_model - missed_fraud
     c3.metric(
-        "Fraud Savings vs No Model",
-        f"${savings:,.0f}",
-        f"${no_model:,.0f} baseline",
+        "False Positive Rate",
+        f"{fpr:.1%}",
+        f"{fp:,} false alarms flagged",
     )
 
     render_footer()
@@ -389,7 +392,27 @@ with tab2:
     st.subheader("Optimization Journey")
     journey_df = pd.DataFrame([
         {
+            "Stage": "0",
+            "Model": "No Model",
+            "Optimization": "--",
+            "Test Recall": "0.0%",
+            "ROC-AUC": "N/A",
+            "PR-AUC": "N/A",
+            "Total Cost": "$922,528",
+            "Selected": "",
+        },
+        {
             "Stage": "1",
+            "Model": "Logistic Regression",
+            "Optimization": "Balanced class weights",
+            "Test Recall": "94.7%",
+            "ROC-AUC": "0.5974",
+            "PR-AUC": "0.0486",
+            "Total Cost": "$1,111,228",
+            "Selected": "",
+        },
+        {
+            "Stage": "2",
             "Model": "XGBoost",
             "Optimization": "Bayesian (Optuna)",
             "Test Recall": "74.3%",
@@ -399,7 +422,7 @@ with tab2:
             "Selected": "",
         },
         {
-            "Stage": "2",
+            "Stage": "3",
             "Model": "LightGBM",
             "Optimization": "Bayesian (Optuna)",
             "Test Recall": "73.8%",
@@ -411,10 +434,11 @@ with tab2:
     ])
     st.dataframe(journey_df, use_container_width=True, hide_index=True)
     st.caption(
-        "Both models evaluated at threshold = 0.420 on 118,108 test transactions "
+        "All models evaluated at threshold = 0.420 on 118,108 test transactions "
         "(chronological split, no data leakage). "
-        "LightGBM wins: $9,310 lower total cost and higher AUC despite marginally "
-        "lower recall. Cost minimisation is the primary selection criterion."
+        "Note: Logistic Regression costs more than No Model due to high false-positive volume. "
+        "LightGBM wins Stage 3: $9,310 lower cost than XGBoost and higher AUC. "
+        "Cost minimisation is the primary selection criterion."
     )
 
     st.markdown("---")
@@ -662,34 +686,9 @@ with tab3:
                 "Multiple moderate risk factors accumulated",
             ],
         },
-        "Case 5: Auto-Block Candidate -- High Confidence": {
-            "score": 0.9342, "actual": "LEGITIMATE", "decision": "AUTO-BLOCK",
-            "waterfall_file": "shap_waterfall_case5.png",
-            "features": {
-                "Transaction Amount": "$15.00",
-                "Time of Day": "9:00 AM",
-                "Transactions (1 hour)": "1",
-                "Transactions (24 hours)": "2",
-                "Weekend": "Yes",
-                "Spending Anomaly": "-0.26 std devs",
-                "First Transaction": "No (returning client)",
-            },
-            "explanation": (
-                "High-confidence false alarm (score 0.93) illustrating the risk "
-                "of auto-blocking. While rare, these cases highlight the need "
-                "for rapid dispute resolution and continuous model monitoring. "
-                "The SHAP explanation provides the audit trail needed for "
-                "customer communication."
-            ),
-            "drivers": [
-                "Score exceeded auto-block threshold (0.90)",
-                "Pattern matched card-testing signature",
-                "Demonstrates need for rapid dispute resolution workflow",
-            ],
-        },
-        "Case 6: Borderline -- Near Review Threshold": {
+        "Case 5: Borderline -- Near Review Threshold": {
             "score": 0.3648, "actual": "LEGITIMATE", "decision": "AUTO-APPROVE",
-            "waterfall_file": "shap_waterfall_case6.png",
+            "waterfall_file": "shap_waterfall_case5.png",
             "features": {
                 "Transaction Amount": "$125.00",
                 "Time of Day": "Afternoon",

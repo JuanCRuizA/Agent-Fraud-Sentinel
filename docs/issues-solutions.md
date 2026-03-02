@@ -134,7 +134,7 @@ print(f"Manual review threshold: >= {manual_threshold:.3f}")
 **Root Cause:** The `.gitignore` file excluded `models/*.pkl` and `data/processed/*`. These files existed locally but were never committed to GitHub, so Streamlit Cloud could not find them.
 **Solution:**
 1. Commented out `models/*.pkl` in `.gitignore` to allow model files (< 1 MB total) to be tracked
-2. Created a slim `test_dashboard.csv` (4.2 MB, 8 columns only) instead of committing the full `test.csv` (145 MB, 442 columns) which exceeded GitHub's 100 MB file limit
+2. Created a slim `test_dashboard.csv` (8.3 MB, 8 columns only) instead of committing the full `test.csv` (145 MB, 442 columns) which exceeded GitHub's 100 MB file limit
 3. Updated `dashboard_app.py` to load `test_dashboard.csv` first, falling back to `test.csv` for local development
 **Prevention:** When building Streamlit Cloud apps, ensure all required data and model files are committed to the repository. For large files, create slim versions with only the columns needed by the dashboard. Check `.gitignore` rules before deployment.
 
@@ -146,7 +146,7 @@ print(f"Manual review threshold: >= {manual_threshold:.3f}")
 **Severity:** 🟡 Medium
 **Problem:** The full `data/processed/test.csv` (145 MB, 118,108 rows x 442 columns) exceeded GitHub's 100 MB per-file limit and could not be committed.
 **Root Cause:** The test CSV contained all 442 original + engineered columns, but the dashboard only uses 8 columns (7 features + isFraud). The remaining 434 columns added ~141 MB of unnecessary data.
-**Solution:** Created `notebooks/dashboard/test_dashboard.csv` containing only the 8 columns needed by the dashboard. This reduced file size from 145 MB to 4.2 MB (97% reduction). The dashboard app tries the slim file first, then falls back to the full test set if available locally.
+**Solution:** Created `notebooks/dashboard/test_dashboard.csv` containing only the 8 columns needed by the dashboard. This reduced file size from 145 MB to 8.3 MB (97% reduction). The dashboard app tries the slim file first, then falls back to the full test set if available locally.
 **Prevention:** For deployment artifacts, always create minimal data files with only the columns required by the application. Keep full datasets in `.gitignore` and commit only slim versions.
 
 ---

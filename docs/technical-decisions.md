@@ -23,6 +23,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - [DECISION-013] Slim Test Data for Streamlit Cloud Deployment
 - [DECISION-014] Bayesian Optimization (Optuna) Over Grid Search
 - [DECISION-015] LightGBM as Third Model for Gradient Boosting Comparison
+- [DECISION-016] Horizontal st.tabs() Navigation for 5-Tab Dashboard
 
 ### Pending Review
 - None
@@ -163,27 +164,32 @@ Document key technical decisions, rationale, and alternatives considered during 
 ---
 
 ### [DECISION-006] Asymmetric Cost Assumptions for Model Evaluation
-**Date:** 2026-02-08
+**Date:** 2026-02-08 (updated 2026-03-02)
 **Status:** ✅ Implemented
 **Context:** In banking fraud detection, False Negatives (missed fraud) and False Positives (false alarms) have very different business costs. Standard metrics like accuracy fail to capture this asymmetry.
-**Decision:** Define cost parameters derived from EDA:
-- **False Negative cost: $75.00** (median fraud transaction amount)
+**Decision:** Define full economic cost parameters:
+- **False Negative cost: $227.00** (full economic: $75 transaction loss + $27 chargeback fee + $50 ops investigation + $75 reputational/regulatory)
 - **False Positive cost: $10.00** (industry benchmark for manual review)
-- **Cost ratio: 7.5:1** (missing fraud is 7.5x more costly than a false alarm)
+- **Cost ratio: 22.7:1** (missing fraud is 22.7x more costly than a false alarm)
 **Rationale:**
-- Median ($75) preferred over mean ($149.24) because the mean is inflated by outliers (max $5,191)
+- Initial EDA used median transaction amount ($75) as a conservative FN proxy
+- Updated to full economic cost ($227) to reflect all downstream costs of a missed fraud: transaction loss, chargeback, internal investigation, and reputational/regulatory impact
 - $10 manual review cost is a widely used industry benchmark (analyst time + customer friction)
-- The 7.5:1 ratio will directly inform `scale_pos_weight` in XGBoost and threshold optimization
-- Documented in EDA notebook for traceability — not a "magic number" pulled from thin air
+- The 22.7:1 ratio is stored in `threshold_config.pkl` and used by all downstream threshold optimization and the Streamlit dashboard
+- Documented for traceability -- not a "magic number" pulled from thin air
 **Alternatives Considered:**
-- Mean fraud amount ($149.24): Skewed by outliers, overestimates typical loss
+- Median transaction amount only ($75): Underestimates true business impact; ignores chargeback, ops, and reputational costs
+- Mean fraud amount ($149.24): Skewed by outliers, still incomplete without downstream costs
 - Equal costs (1:1 ratio): Ignores business reality, optimizes for accuracy instead of value
 - Per-transaction cost (actual amount): More precise but requires custom loss function
 **Consequences:**
-- Model evaluation will use cost-weighted metrics alongside standard AUC/F1
-- Threshold tuning will optimize for minimum total cost, not just classification accuracy
-- Stakeholder presentations can frame model value in dollar terms
-**Related:** `notebooks/exploratory/01_eda_fraud_patterns.ipynb` (Section 10)
+- Model evaluation uses cost-weighted metrics alongside standard AUC/F1
+- Threshold tuning optimizes for minimum total cost, not just classification accuracy
+- Test set total cost at optimal threshold: $730,482 (LightGBM, threshold 0.420)
+- No-model baseline cost: $922,528 (all fraud undetected)
+- Savings vs no-model: $192,046 (20.8% reduction)
+- Stakeholder presentations frame model value in dollar terms
+**Related:** `notebooks/exploratory/01_eda_fraud_patterns.ipynb` (Section 10), `models/threshold_config.pkl`
 
 ---
 
@@ -213,10 +219,10 @@ Document key technical decisions, rationale, and alternatives considered during 
 ---
 
 ### [DECISION-008] Constrained Optimization with 75% Minimum Recall Over Pure Cost Minimization
-**Date:** 2026-02-08
+**Date:** 2026-02-08 (updated 2026-03-02)
 **Status:** ✅ Implemented
 **Context:** Unconstrained cost optimization found threshold 0.720 with lowest total cost ($326K), but this only catches 17.1% of fraud (788 of 4,611 frauds). Real banks prioritize fraud detection over pure cost minimization.
-**Decision:** Implement constrained optimization requiring minimum 75% recall, resulting in threshold 0.410.
+**Decision:** Implement constrained optimization requiring minimum 75% recall, resulting in threshold 0.420.
 **Rationale:**
 - **Business reality**: Banks cannot tolerate catching only 14% of fraud, even if it minimizes immediate operational cost
 - **Regulatory compliance**: Financial institutions face penalties for inadequate fraud prevention
@@ -228,7 +234,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 2. **Higher recall targets (85-90%)**: Would require threshold ~0.25-0.30, causing FP explosion (100K+ false alarms)
 3. **Fixed threshold (0.5)**: Arbitrary choice, doesn't account for business costs (60.9% recall, moderate cost)
 **Consequences:**
-- **Threshold shifts**: From 0.720 (unconstrained) to 0.410 (constrained 75%)
+- **Threshold shifts**: From 0.720 (unconstrained) to 0.420 (constrained 75%)
 - **Recall improvement**: 17.1% → 76.6% (catches 2,743 additional frauds on validation set)
 - **Cost increase**: $326K → $578K (77.2% increase, or +$252K)
 - **Cost per additional fraud caught**: $91.87 (vs $75 median fraud amount — slightly negative ROI on cost alone)
@@ -239,12 +245,12 @@ Document key technical decisions, rationale, and alternatives considered during 
 ---
 
 ### [DECISION-009] Multi-Threshold Production Strategy Over Single Threshold
-**Date:** 2026-02-08
+**Date:** 2026-02-08 (updated 2026-03-02)
 **Status:** ✅ Implemented
 **Context:** Single threshold (0.410) achieves 75% recall but generates 51,524 manual reviews on validation set (46.6% of all transactions). This is operationally expensive and treats all flagged transactions equally, ignoring confidence levels.
 **Decision:** Implement three-tier strategy:
 - **Auto-block (score ≥ 0.90)**: Instant fraud block, $5 cost (automated processing)
-- **Manual review (0.410 ≤ score < 0.90)**: Human analyst review, $10 cost
+- **Manual review (0.420 ≤ score < 0.90)**: Human analyst review, $10 cost
 - **Auto-approve (score < 0.410)**: No review, $0 cost
 **Rationale:**
 - **Confidence-based triage**: High-confidence fraud (≥0.90) doesn't need human review
@@ -253,7 +259,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - **Faster fraud blocking**: Auto-block enables instant rejection for score ≥0.90 (no analyst queue)
 - **Realistic banking practice**: Real fraud systems use tiered decision rules, not binary threshold
 **Alternatives Considered:**
-- Single threshold (0.410): 76% recall but all 55,029 flagged txns require manual review
+- Single threshold (0.420): 76% recall but all flagged txns require manual review
 - Four-tier strategy: Adding "auto-approve-with-monitoring" tier (0.30-0.41) adds complexity without clear benefit
 - Adaptive thresholds: Dynamic adjustment based on fraud rate trends (future enhancement)
 **Consequences:**
@@ -326,7 +332,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 
 ### [DECISION-012] Sidebar Radio Navigation Over st.tabs() for Dashboard
 **Date:** 2026-02-09
-**Status:** ✅ Implemented
+**Status:** ❌ Superseded by DECISION-016
 **Context:** The Streamlit dashboard needs clear navigation across 4 content areas (Executive Summary, Model Performance, Case Study Explorer, Regulatory Compliance). Streamlit offers both `st.tabs()` and `st.sidebar.radio()` as navigation patterns.
 **Decision:** Use `st.sidebar.radio()` for page navigation, with each page rendered conditionally in the main area.
 **Rationale:**
@@ -345,17 +351,19 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Sidebar space is efficiently used: branding + navigation + filters + about, all in one column
 **Related:** `notebooks/dashboard/dashboard_app.py`
 
+> **Note:** This decision was superseded when the dashboard was rebuilt with a 5-tab horizontal layout (see DECISION-016). The sidebar now contains only global controls (threshold slider, sample size, export button); navigation moved to `st.tabs()`.
+
 ---
 
 ### [DECISION-013] Slim Test Data for Streamlit Cloud Deployment
 **Date:** 2026-02-10
 **Status:** ✅ Implemented
 **Context:** The dashboard needs test data to compute live predictions. The full `test.csv` (145 MB, 442 columns) exceeds GitHub's 100 MB file size limit, making it impossible to commit for Streamlit Cloud deployment.
-**Decision:** Create `test_dashboard.csv` containing only the 8 columns needed by the dashboard (7 model features + isFraud), reducing file size from 145 MB to 4.2 MB. The app loads this slim file first, falling back to the full `test.csv` for local development.
+**Decision:** Create `test_dashboard.csv` containing only the 11 columns needed by the dashboard (7 model features + isFraud + client_id + TransactionID + TransactionDT), reducing file size from 145 MB to 8.3 MB. The app loads this slim file first, falling back to the full `test.csv` for local development.
 **Rationale:**
-- **97% size reduction**: 145 MB to 4.2 MB by removing 434 unused columns
+- **97% size reduction**: 145 MB to 8.3 MB by removing 431 unused columns
 - **No data loss**: All 118,108 rows preserved; only unnecessary columns removed
-- **GitHub compatible**: 4.2 MB is well within GitHub's 100 MB limit
+- **GitHub compatible**: 8.3 MB is well within GitHub's 100 MB limit
 - **Graceful fallback**: `dashboard_app.py` tries slim file first, falls back to full test set
 - **Separation of concerns**: Dashboard data file is independent of the full analysis dataset
 **Alternatives Considered:**
@@ -417,5 +425,29 @@ Document key technical decisions, rationale, and alternatives considered during 
 - LightGBM Bayesian wins current run (PR-AUC 0.1126 vs 0.1116 XGBoost Bayesian)
 - No changes needed to Phase 4 (SHAP) or Phase 5 (dashboard) since they load by filename
 **Related:** `notebooks/modeling/03_model_training.ipynb` (Section 5, Section 6.2, Section 7), DECISION-014
+
+---
+
+### [DECISION-016] Horizontal st.tabs() Navigation for 5-Tab Dashboard
+**Date:** 2026-02-28 (supersedes DECISION-012)
+**Status:** ✅ Implemented
+**Context:** The original dashboard used `st.sidebar.radio()` for navigation across 4 sections. When the dashboard was rebuilt to add a 5th tab (Client Risk Profile) and align with modern Streamlit UX patterns, the navigation approach was reconsidered.
+**Decision:** Replace sidebar radio navigation with horizontal `st.tabs()` across 5 tabs: Executive Summary, Model Comparison, Case Study Explorer, Client Risk Profile, Regulatory Compliance.
+**Rationale:**
+- **Discoverability**: Horizontal tabs make all sections immediately visible without sidebar interaction
+- **Screen real estate**: Sidebar freed up for global controls only (threshold slider, sample size selector, export button)
+- **Standard UX**: `st.tabs()` is the Streamlit-recommended pattern for multi-section apps as of 2024
+- **5th tab**: Client Risk Profile (analyst investigation workflow) fits naturally as a peer tab, not a sidebar item
+- **Portfolio signal**: Modern tab layout is more recognizable to non-technical stakeholders
+**Alternatives Considered:**
+- Keep sidebar radio with 5 options: Sidebar becomes crowded with 5 nav items + global filters + branding
+- Multi-page app (`pages/` directory): More complex file structure; harder to maintain for a portfolio prototype
+- Combined sidebar radio + tabs: Redundant navigation, confusing UX
+**Consequences:**
+- Sidebar now contains only: BAFS branding, threshold slider, sample size selector, export button, About & Methods expander
+- `render_footer()` still called at the bottom of every tab for consistency
+- Tab state is not preserved across browser refresh (acceptable for a portfolio demo)
+- DECISION-012 (sidebar radio) is superseded
+**Related:** `notebooks/dashboard/dashboard_app.py`, DECISION-012
 
 ---

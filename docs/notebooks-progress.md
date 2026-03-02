@@ -188,7 +188,7 @@
 **Threshold Optimization (based on winning model):**
 - **Pure cost minimization**: threshold 0.720, 17.1% recall, $326K cost (unacceptable for production)
 - **Constrained optimization (75% recall floor)**: threshold 0.410, actual recall 76.6%, $578K validation cost (+77.2%)
-- **Test set (unbiased)**: 74.4% recall, 3,025 of 4,064 frauds caught, precision 5.8%, $572,900 total cost
+- **Test set (unbiased)**: 73.8% recall, cost $730,482 ($6.18/txn) -- LightGBM Bayesian at threshold 0.420
 
 **Production Strategy (Multi-Threshold):**
 - **Auto-block (>=0.90)**: high-confidence fraud, automated processing
@@ -201,7 +201,7 @@
 1. **Data Cleaning**: Replace `inf` with +/-10, `NaN` with 0 in amount_deviation feature
 2. **Class Imbalance**: scale_pos_weight=28.56 (XGBoost), is_unbalance=True (LightGBM)
 3. **Evaluation Metric**: PR-AUC preferred over ROC-AUC for imbalanced data
-4. **Cost Parameters**: FN=$75 (median fraud), FP=$10 (manual review), ratio 7.5:1
+4. **Cost Parameters**: FN=$227 (full economic), FP=$10 (manual review), ratio 22.7:1
 5. **Recall Constraint**: 75% minimum (business requirement overrides pure cost minimization)
 6. **Multi-Threshold**: Tiered strategy reduces manual review workload while maintaining recall
 7. **Dynamic Winner**: `final_proba_val`/`final_proba_test` set by winner selection; all downstream cells use these generic names
@@ -212,7 +212,7 @@
 - `models/scaler.pkl` - StandardScaler fitted on training data only
 - `models/threshold_config.pkl` - Production configuration:
   - `auto_block_threshold`: 0.90 (high confidence fraud)
-  - `manual_review_threshold`: ~0.41 (75% recall target)
+  - `manual_review_threshold`: 0.420 (75% recall target)
   - `min_recall_target`: 0.75
   - `winning_model`: name of winning algorithm
   - Cost parameters and feature list included
@@ -250,7 +250,7 @@
 **Date:** 2026-02-09
 **Status:** ✅ Completed (38 cells)
 **Location:** `notebooks/modeling/04_shap_explainability.ipynb`
-**Objective:** Explain XGBoost fraud predictions so fraud analysts, business stakeholders, and regulators understand *why* the model flags or approves each transaction.
+**Objective:** Explain LightGBM fraud predictions so fraud analysts, business stakeholders, and regulators understand *why* the model flags or approves each transaction.
 
 ### Focus Areas
 - Global feature importance (SHAP summary and bar charts)
@@ -262,7 +262,7 @@
 
 | Section | Content |
 |---------|---------|
-| 1. Setup & Model Loading | Load XGBoost, scaler, threshold config from Phase 3 |
+| 1. Setup & Model Loading | Load LightGBM (`best_model_final.pkl`), scaler, threshold config from Phase 3 |
 | 2. Global Explainability | SHAP TreeExplainer on 2,000-sample subset |
 | 2.1 Summary Plot | Beeswarm showing per-feature, per-transaction impact |
 | 2.2 Feature Importance Bar | Mean |SHAP| ranked bar chart |
@@ -325,7 +325,7 @@
 ## 05_streamlit_dashboard.ipynb
 
 **Date:** 2026-02-09 (updated 2026-02-10)
-**Status:** ✅ Completed (17 cells) + deployed to Streamlit Cloud
+**Status:** ✅ Completed (18 cells) + deployed to Streamlit Cloud
 **Location:** `notebooks/dashboard/05_streamlit_dashboard.ipynb`
 **Objective:** Build a professional, interactive dashboard for fraud detection analytics, model explainability, and regulatory compliance — targeting a Data Scientist portfolio for banking roles.
 
@@ -333,21 +333,24 @@
 
 ```
 +------------------+---------------------------------------------+
-| SIDEBAR          | MAIN AREA                                   |
+| SIDEBAR          | MAIN AREA (st.tabs horizontal navigation)   |
 |                  |                                             |
 | BAFS             | [Tab 1] Executive Summary                   |
 | Banking Anti-    |   - KPI cards, risk distribution, costs     |
 | Fraud System     |                                             |
-|                  | [Tab 2] Model Performance                   |
-| Navigation       |   - Confusion matrix, ROC, PR, importance   |
-| (radio buttons)  |                                             |
-|                  | [Tab 3] Case Study Explorer                 |
-| Global Filters   |   - 6 cases with SHAP + explanations        |
-| (threshold,      |                                             |
-|  sample size)    | [Tab 4] Regulatory Compliance               |
-|                  |   - SR 11-7, fair lending, audit trail      |
+|                  | [Tab 2] Model Comparison                    |
+| Threshold slider |   - Journey table, PR/ROC, confusion matrix |
+| Sample size      |                                             |
+| Export button    | [Tab 3] Case Study Explorer                 |
+|                  |   - 5 cases with individual SHAP waterfalls |
 | About & Methods  |                                             |
-| (expandable)     | [FOOTER on every tab]                       |
+| (expandable)     | [Tab 4] Client Risk Profile                 |
+|                  |   - Flagged watchlist, transaction history  |
+|                  |                                             |
+|                  | [Tab 5] Regulatory Compliance               |
+|                  |   - SR 11-7, fair lending, audit trail      |
+|                  |                                             |
+|                  | [FOOTER on every tab]                       |
 +------------------+---------------------------------------------+
 ```
 
@@ -355,11 +358,11 @@
 
 | Section | Content |
 |---------|---------|
-| 1. Setup & Dependencies | Verify packages and model artifacts exist |
+| 1. Setup & Dependencies | Verify packages (lightgbm) and model artifacts (best_model_final.pkl) |
 | 2. Dashboard Architecture | Layout diagram, file dependencies, design principles |
-| 3. Streamlit Application | `%%writefile dashboard_app.py` — complete app (~600 lines) |
-| 4. Tab Design Documentation | Design rationale for all 4 tabs (Markdown) |
-| 5. Deployment | `requirements.txt`, local run instructions, Streamlit Cloud notes |
+| 3. Streamlit Application | `%%writefile dashboard_app.py` -- complete app (~1,100 lines) |
+| 4. Tab Design Documentation | Design rationale for all 5 tabs + code cell parsing journey data from app |
+| 5. Deployment | `requirements.txt` (lightgbm), local run instructions, Streamlit Cloud notes |
 | Summary | Features table, interactive controls, production readiness checklist |
 
 ### Tab Content
@@ -368,37 +371,46 @@
 - 4 KPI cards: Fraud Detected, FPR, Fraud Prevented ($), Total Cost
 - Performance table (recall, precision, F1, FPR, threshold)
 - Risk score distribution histogram (fraud vs legitimate with threshold line)
-- Cost analysis: missed fraud cost, false alarm cost, savings vs no-model baseline
+- Cost analysis: missed fraud cost ($227/FN), false alarm cost ($10/FP), savings vs no-model baseline
 
-**Tab 2 — Model Performance:**
-- Confusion matrix with cost overlay ($75 FN, $10 FP)
-- ROC curve with operating point at current threshold
-- Precision-Recall curve with baseline and operating point
-- Feature importance (SHAP bar chart from Phase 4, or fallback to model importances)
+**Tab 2 — Model Comparison:**
+- Optimization journey table (4-stage: No Model -> LightGBM winner)
+- PR curve comparison (pre-computed image) + cost vs threshold image
+- Live confusion matrix with cost overlay ($227 FN, $10 FP), updates with threshold slider
+- Live ROC curve with operating point at current threshold
+- SHAP feature importance bar chart (from Phase 4)
 - Cost-benefit analysis table across 8 threshold values
 
 **Tab 3 — Case Study Explorer:**
-- Dropdown to select from 6 case studies (from Phase 4 analysis)
+- Dropdown to select from 5 case studies (TP clear, TP velocity, FN missed, FP false alarm, Borderline)
 - Transaction features in human-readable format
-- SHAP waterfall plot (loaded from `figures/shap/shap_waterfall_cases.png`)
+- Individual SHAP waterfall plot per case (fallback to 6-panel grid)
 - Plain-English model decision explanation
 - Key risk drivers as bullet points
-- Recommended improvements (for missed fraud cases)
 
-**Tab 4 — Regulatory Compliance:**
-- SR 11-7 checklist (8 completed, 4 pending) with checkboxes
-- Fair lending considerations table (5 features assessed)
-- Model governance framework (identification, risk classification, monitoring schedule)
-- Right-to-explanation capabilities and dispute resolution workflow
+**Tab 4 — Client Risk Profile:**
+- Minimum risk score filter + sort-by selector
+- Flagged client watchlist with risk level badge (auto-block / review / low)
+- Client summary: total txns, max score, confirmed fraud count, total amount
+- Transaction history table + fraud score bar chart
+
+**Tab 5 — Regulatory Compliance:**
+- HTML table of contents with anchor links
+- SR 11-7 checklist (8 completed, 4 pending)
+- Fair lending review (5 features assessed)
+- Model governance framework (identification, risk tier, monitoring schedule)
+- Right-to-explanation and dispute resolution workflow
 - Data lineage and audit trail documentation
 
 ### Interactive Controls
 
 | Control | Location | Effect |
 |---------|----------|--------|
-| Risk Threshold slider | Sidebar | Updates all metrics, confusion matrix, and cost analysis |
+| Risk Threshold slider | Sidebar | Updates KPIs, confusion matrix, cost analysis |
 | Sample Size selector | Sidebar | Subsamples test data for faster exploration |
-| Case Study dropdown | Tab 3 | Selects individual transaction for detailed analysis |
+| Export button | Sidebar | Downloads flagged transactions as CSV |
+| Case Study dropdown | Tab 3 | Selects individual transaction for detailed SHAP analysis |
+| Client filter + sort | Tab 4 | Filters and sorts the flagged account watchlist |
 
 ### Artifacts Produced
 
@@ -406,7 +418,7 @@
 |------|-------------|
 | `notebooks/dashboard/dashboard_app.py` | Standalone Streamlit application (~600 lines) |
 | `notebooks/dashboard/requirements.txt` | Python dependencies for deployment |
-| `notebooks/dashboard/test_dashboard.csv` | Slim test data (8 columns, 4.2 MB) for Streamlit Cloud |
+| `notebooks/dashboard/test_dashboard.csv` | Slim test data (8 columns, 8.3 MB) for Streamlit Cloud |
 
 ### Deployment
 - **Local:** `cd notebooks/dashboard && streamlit run dashboard_app.py`
@@ -423,6 +435,6 @@
 ### Issues Encountered & Resolved
 - [ISSUE-009] `use_container_width` deprecation warning — replaced with `width="stretch"`
 - [ISSUE-010] Streamlit Cloud FileNotFoundError — model and data files excluded by `.gitignore`
-- [ISSUE-011] Test CSV too large for GitHub (145 MB) — created slim 4.2 MB version
+- [ISSUE-011] Test CSV too large for GitHub (145 MB) — created slim 8.3 MB version
 
 ---
