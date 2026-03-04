@@ -901,11 +901,11 @@ with tab4:
         ax.bar(client_txns['#'], client_txns['fraud_score'], color=bar_colors)
         ax.axhline(
             y=float(AUTO_BLOCK), color='#c62828', linestyle='--',
-            linewidth=1.5, label=f'Auto-Block ({float(AUTO_BLOCK):.2f})',
+            linewidth=1.5, label=f'Auto-Block threshold ({float(AUTO_BLOCK):.2f})',
         )
         ax.axhline(
             y=float(MANUAL_REVIEW), color='#e65100', linestyle='--',
-            linewidth=1.5, label=f'Manual Review ({float(MANUAL_REVIEW):.2f})',
+            linewidth=1.5, label=f'Manual Review threshold ({float(MANUAL_REVIEW):.2f})',
         )
         ax.set_xlabel("Transaction #", fontsize=11)
         ax.set_ylabel("Fraud Score", fontsize=11)
@@ -914,7 +914,14 @@ with tab4:
             fontsize=13, fontweight="bold",
         )
         ax.set_ylim(0, 1.05)
-        ax.legend(fontsize=9)
+        from matplotlib.patches import Patch
+        bar_patches = [
+            Patch(facecolor='#c62828', label='Auto-Block (score >= 0.90)'),
+            Patch(facecolor='#e65100', label='Manual Review (0.42 - 0.90)'),
+            Patch(facecolor='#1565C0', label='Approved (score < 0.42)'),
+        ]
+        line_handles, line_labels = ax.get_legend_handles_labels()
+        ax.legend(handles=bar_patches + line_handles, fontsize=9)
         ax.grid(axis='y', alpha=0.3)
         plt.tight_layout()
         st.pyplot(fig)
