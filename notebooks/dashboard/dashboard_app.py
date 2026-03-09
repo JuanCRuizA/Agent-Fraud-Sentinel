@@ -427,7 +427,7 @@ with tab2:
             "Optimization": "Bayesian (Optuna)",
             "Test Recall": "73.8%",
             "ROC-AUC": "0.7198",
-            "PR-AUC": "0.0899",
+            "PR-AUC": "0.1125",
             "Total Cost": "$730,482",
             "Selected": "WINNER",
         },
