@@ -1,5 +1,5 @@
 """
-BAFS - Banking Anti-Fraud System
+SAFE - System for Anti-Fraud Evaluation
 Streamlit Dashboard Prototype
 
 Phase 5: Interactive Model Explainability & Regulatory Dashboard
@@ -29,7 +29,7 @@ warnings.filterwarnings('ignore')
 # Page Configuration
 # ─────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="BAFS - Banking Anti-Fraud System",
+    page_title="SAFE - System for Anti-Fraud Evaluation",
     page_icon=":shield:",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -166,7 +166,7 @@ FEATURE_LABELS = {
 # ─────────────────────────────────────────────────────────────────────
 FOOTER_HTML = """
 <div class="footer">
-    <strong>BAFS - Banking Anti-Fraud System</strong><br>
+    <strong>SAFE - System for Anti-Fraud Evaluation</strong><br>
     <a href="https://github.com/JuanCRuizA/Agent-Fraud-Sentinel.git"
        target="_blank">
         https://github.com/JuanCRuizA/Agent-Fraud-Sentinel.git
@@ -187,8 +187,8 @@ def render_footer():
 # Sidebar - Global Configuration Panel
 # ─────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.title("BAFS")
-    st.caption("Banking Anti-Fraud System")
+    st.title("SAFE")
+    st.caption("System for Anti-Fraud Evaluation")
     st.markdown("---")
 
     st.subheader("Global Filters")
@@ -280,7 +280,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # =====================================================================
 with tab1:
     st.header("Executive Summary")
-    st.caption("Key performance indicators for the BAFS fraud detection system")
+    st.caption("Key performance indicators for the SAFE fraud detection system")
 
     # Compute KPIs
     tp = int(((y_filt == 1) & (y_pred_filt == 1)).sum())

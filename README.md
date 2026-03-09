@@ -1,4 +1,4 @@
-# BAFS - Banking Anti-Fraud System
+# SAFE - System for Anti-Fraud Evaluation
 
 An end-to-end fraud detection system built on the IEEE-CIS dataset (590K transactions), featuring cost-sensitive XGBoost modeling, SHAP explainability for regulatory compliance, and a deployed interactive dashboard.
 
