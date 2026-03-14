@@ -61,6 +61,11 @@ st.markdown("""
     }
     .toc-box a { color: #1a365d; text-decoration: none; }
     .toc-box a:hover { text-decoration: underline; }
+    /* Hide Streamlit anchor link icons on all headings */
+    h1 > a, h2 > a, h3 > a, h4 > a, h5 > a, h6 > a,
+    .stMarkdown h1 > a, .stMarkdown h2 > a, .stMarkdown h3 > a {
+        display: none !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -597,15 +602,17 @@ with tab3:
             },
             "explanation": (
                 "This transaction was correctly identified as fraud. Multiple "
-                "strong indicators were present: high daily velocity (9 "
-                "transactions in 24 hours), weekend early-morning timing, and "
-                "a small amount typical of card-testing behaviour. The model "
+                "strong indicators were present: a small amount typical of "
+                "card-testing behaviour ($17.52, SHAP +1.60), early-morning "
+                "timing (6:00 AM, SHAP +0.97), and a spending anomaly score "
+                "below the customer's normal pattern (SHAP +0.17). The model "
                 "automatically blocked this transaction, preventing the loss."
             ),
+            "drivers_title": "Key Risk Drivers",
             "drivers": [
-                "High 24-hour velocity (9 transactions)",
-                "Weekend + early morning (6 AM) timing",
-                "Small amount consistent with card testing",
+                "Transaction Amount (+1.60)",
+                "Time of Day (+0.97)",
+                "Spending Anomaly Score (+0.17)",
             ],
         },
         "Case 2: True Positive -- Velocity-Driven Detection": {
@@ -621,15 +628,19 @@ with tab3:
                 "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "This fraud was detected primarily through velocity signals. "
-                "The combination of elevated 24-hour velocity, 4 AM timing, "
-                "and above-average spending deviation pushed the score into "
-                "the manual review zone. An analyst would confirm this as fraud."
+                "This fraud was detected primarily through early-morning "
+                "timing (4 AM, SHAP +0.86). Transaction velocity in the last "
+                "hour (+0.36) and above-average spending deviation (+0.24) "
+                "reinforced the fraud signal. Despite these indicators, the "
+                "transaction amount of $59.64 partially attenuated the score "
+                "(-0.24), resulting in a manual review decision rather than "
+                "auto-block."
             ),
+            "drivers_title": "Key Risk Drivers",
             "drivers": [
-                "Velocity features elevated (3 txns in 24 hrs)",
-                "4 AM transaction time",
-                "Above-average spending deviation (+0.54 std devs)",
+                "Time of Day (+0.86)",
+                "Transaction Velocity 1 hour (+0.36)",
+                "Spending Anomaly Score (+0.24)",
             ],
         },
         "Case 3: False Negative -- Missed Fraud": {
@@ -645,20 +656,29 @@ with tab3:
                 "First Transaction": "Yes (new client)",
             },
             "explanation": (
-                "The model failed to detect this fraud because all behavioural "
-                "features appeared normal. Zero velocity, moderate amount, and "
-                "business-hours timing produced no warning signals. This is a "
-                "model limitation: sophisticated fraudsters who isolate "
-                "transactions can evade velocity-based detection."
+                "The model failed to detect this fraud because the complete "
+                "absence of recent transaction activity (0 in 24 hours, 0 in "
+                "1 hour) was interpreted as low-risk behavior (SHAP -1.91), "
+                "consistent with patterns the model learned from legitimate "
+                "low-frequency customers, and a spending pattern below the "
+                "customer's baseline (SHAP -0.58) further suppressed the "
+                "fraud score. This represents a model limitation: fraud "
+                "transactions that lack velocity signals and show "
+                "below-baseline spending fall outside the model's learned "
+                "fraud patterns."
             ),
+            "drivers_title": "Key Factors in Missed Detection",
             "drivers": [
-                "Zero velocity (no burst pattern to detect)",
-                "Normal business hours",
-                "First transaction (no client history)",
+                "Zero transaction velocity 24h (SHAP -1.91) -- absence interpreted as legitimate",
+                "Below-baseline spending anomaly (SHAP -0.58) -- reinforced legitimacy signal",
+                "Zero transaction velocity 1h (SHAP -0.09) -- minor, same direction",
             ],
             "improvement": (
-                "Consider adding merchant-category features and device "
-                "fingerprinting to catch isolated sophisticated fraud."
+                "Engineer composite features that cross-reference "
+                "zero-velocity patterns with new-client flags and spending "
+                "anomaly scores. Incorporate existing dataset features "
+                "(DeviceInfo, ProductCD, id_01 to id_38) to provide "
+                "orthogonal signals that velocity alone cannot capture."
             ),
         },
         "Case 4: False Positive -- Legitimate Flagged": {
@@ -674,16 +694,22 @@ with tab3:
                 "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "This legitimate transaction was incorrectly blocked. Weekend "
-                "timing, low amount (similar to card-testing), and moderate "
-                "velocity combined to trigger the model. This case demonstrates "
-                "why dispute resolution processes are essential alongside "
-                "automated blocking."
+                "This legitimate transaction was incorrectly blocked (False "
+                "Positive). The small transaction amount of $15.00 was the "
+                "dominant factor (SHAP +1.24), triggering patterns the model "
+                "associates with card-testing behavior. A moderate transaction "
+                "velocity (+0.41, +0.32) further reinforced the fraud signal. "
+                "The combination of multiple moderate-to-strong positive SHAP "
+                "values across nearly all features produced a high fraud score "
+                "(0.9342), leaving the model with no offsetting signals to "
+                "recognize this as legitimate. This resulted in an unnecessary "
+                "block and a negative customer experience."
             ),
+            "drivers_title": "Key Factors in False Alert",
             "drivers": [
-                "Weekend + morning timing",
-                "Small amount triggered card-testing pattern",
-                "Multiple moderate risk factors accumulated",
+                "Transaction Amount (+1.24) -- dominant false signal",
+                "Time of Day (+0.54)",
+                "Transaction Velocity 1 hour (+0.41)",
             ],
         },
         "Case 5: Borderline -- Near Review Threshold": {
@@ -699,15 +725,22 @@ with tab3:
                 "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "This borderline case scored just below the manual review "
-                "threshold (0.42). No velocity flags and a reasonable amount "
-                "led to approval. Small behaviour changes in velocity or amount "
-                "could tip similar transactions into the review zone."
+                "This legitimate transaction was correctly approved despite a "
+                "moderately elevated fraud signal from the transaction amount "
+                "(SHAP +0.61). Afternoon timing (SHAP -0.29), normal spending "
+                "patterns (SHAP -0.18), and zero recent transaction velocity "
+                "(SHAP -0.08) collectively offset the amount signal, bringing "
+                "the final score to 0.3648 -- below the manual review "
+                "threshold of 0.42. This case demonstrates the model's "
+                "ability to balance competing signals: while $125.00 triggered "
+                "some fraud-associated patterns, the overall behavioral "
+                "context correctly indicated legitimate activity."
             ),
+            "drivers_title": "Key Factors in Correct Approval",
             "drivers": [
-                "Score near but below threshold (0.36 vs 0.42)",
-                "No velocity anomalies",
-                "Normal transaction pattern with slight uncertainty",
+                "Time of Day (-0.29) -- afternoon timing consistent with legitimate activity",
+                "Spending Anomaly Score (-0.18) -- normal spending pattern",
+                "Transaction Velocity 1 hour (-0.08) -- no unusual activity",
             ],
         },
     }
@@ -760,7 +793,7 @@ with tab3:
     st.subheader("Model Decision Explanation")
     st.write(case["explanation"])
 
-    st.subheader("Key Risk Drivers")
+    st.subheader(case.get("drivers_title", "Key Risk Drivers"))
     for d in case["drivers"]:
         st.markdown(f"- {d}")
 

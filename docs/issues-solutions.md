@@ -196,3 +196,14 @@ print(f"Manual review threshold: >= {manual_threshold:.3f}")
 **Prevention:** When implementing dynamic model selection, immediately audit ALL downstream cells for hardcoded model-specific variable references. Variable naming conventions alone do not guarantee correct wiring.
 
 ---
+
+### [ISSUE-016] Tab 3 Narratives Contradict SHAP Waterfall Plots
+**Date:** 2026-03-13
+**Status:** ✅ Resolved
+**Severity:** 🔴 Critical
+**Problem:** All 5 case studies in Tab 3 (Case Study Explorer) had narrative text (Model Decision Explanation and Key Risk Drivers) that contradicted the actual SHAP waterfall plots. Issues included: wrong feature order (4/5 cases), features with negative SHAP listed as risk drivers (3/5 cases), incorrect section titles for non-TP case types (3/5 cases), and generic archetype descriptions instead of case-specific SHAP-based explanations (5/5 cases).
+**Root Cause:** Narratives were semi-hardcoded templates describing generic fraud archetypes rather than being derived from actual SHAP values. For example, Case 1 listed "High 24-hour velocity" as the top driver, but Transaction Amount (SHAP +1.60) was the dominant signal; Case 5 claimed "reasonable amount led to approval" but Transaction Amount had SHAP +0.61 pushing toward fraud.
+**Solution:** Rewrote all 5 case explanations and driver lists to match actual SHAP values from the waterfall plots. Added `drivers_title` field to each case for dynamic section titles: "Key Risk Drivers" (TP), "Key Factors in Missed Detection" (FN), "Key Factors in False Alert" (FP), "Key Factors in Correct Approval" (TN). Also added CSS to hide Streamlit anchor link icons on all headings.
+**Prevention:** When writing case study narratives for explainable AI dashboards, always derive text directly from model outputs (SHAP values). Cross-reference narrative claims against the actual feature attributions before publishing.
+
+---

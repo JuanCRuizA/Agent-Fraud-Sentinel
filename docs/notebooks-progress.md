@@ -381,12 +381,13 @@
 - SHAP feature importance bar chart (from Phase 4)
 - Cost-benefit analysis table across 8 threshold values
 
-**Tab 3 — Case Study Explorer:**
+**Tab 3 — Case Study Explorer:** (updated 2026-03-13)
 - Dropdown to select from 5 case studies (TP clear, TP velocity, FN missed, FP false alarm, Borderline)
 - Transaction features in human-readable format
 - Individual SHAP waterfall plot per case (fallback to 6-panel grid)
-- Plain-English model decision explanation
-- Key risk drivers as bullet points
+- SHAP-aligned model decision explanations with actual SHAP values cited per feature
+- Dynamic section titles per case type: "Key Risk Drivers" (TP), "Key Factors in Missed Detection" (FN), "Key Factors in False Alert" (FP), "Key Factors in Correct Approval" (TN)
+- Driver bullet points ordered by absolute SHAP magnitude with SHAP values included
 
 **Tab 4 — Client Risk Profile:**
 - Minimum risk score filter + sort-by selector
@@ -436,5 +437,6 @@
 - [ISSUE-009] `use_container_width` deprecation warning — replaced with `width="stretch"`
 - [ISSUE-010] Streamlit Cloud FileNotFoundError — model and data files excluded by `.gitignore`
 - [ISSUE-011] Test CSV too large for GitHub (145 MB) — created slim 8.3 MB version
+- [ISSUE-016] Tab 3 narratives contradicted SHAP plots — rewrote all 5 cases with SHAP-aligned text and dynamic section titles
 
 ---

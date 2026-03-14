@@ -24,6 +24,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - [DECISION-014] Bayesian Optimization (Optuna) Over Grid Search
 - [DECISION-015] LightGBM as Third Model for Gradient Boosting Comparison
 - [DECISION-016] Horizontal st.tabs() Navigation for 5-Tab Dashboard
+- [DECISION-017] SHAP-Aligned Dynamic Narratives for Case Studies
 
 ### Pending Review
 - None
@@ -449,5 +450,30 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Tab state is not preserved across browser refresh (acceptable for a portfolio demo)
 - DECISION-012 (sidebar radio) is superseded
 **Related:** `notebooks/dashboard/dashboard_app.py`, DECISION-012
+
+---
+
+### [DECISION-017] SHAP-Aligned Dynamic Narratives for Case Studies
+**Date:** 2026-03-13
+**Status:** ✅ Implemented
+**Context:** Tab 3 case study narratives were semi-hardcoded templates describing generic fraud archetypes. A systematic review revealed all 5 cases had discrepancies between narrative text and SHAP waterfall plots: wrong feature order, negative-SHAP features listed as risk drivers, and one-size-fits-all "Key Risk Drivers" headings regardless of case type (FN, FP, TN).
+**Decision:** Rewrite all case narratives to directly reference actual SHAP values and introduce dynamic section titles based on case type:
+- True Positive: "Key Risk Drivers"
+- False Negative: "Key Factors in Missed Detection"
+- False Positive: "Key Factors in False Alert"
+- True Negative: "Key Factors in Correct Approval"
+**Rationale:**
+- **Consistency**: Narratives must match the SHAP waterfall plots shown directly above them; contradictions undermine trust in the explainability system
+- **Precision**: Including SHAP values (e.g., "+1.60", "-1.91") in the text gives stakeholders quantitative grounding
+- **Context-appropriate language**: A False Negative should not have "Key Risk Drivers" (the risk was missed); a True Negative should not list "risk drivers" (it was correctly approved)
+- **Interview readiness**: Every claim in the dashboard can be traced to model outputs
+**Alternatives Considered:**
+- Fully dynamic generation from SHAP arrays at runtime: More robust but adds complexity; with only 5 fixed cases, corrected hardcoded text is simpler and equally accurate
+- Keep generic narratives with a disclaimer: Undermines the dashboard's purpose as an explainability tool
+**Consequences:**
+- Each case dict now includes a `drivers_title` field used by the rendering code
+- Driver bullet points include SHAP values and are ordered by absolute magnitude
+- CSS added to hide Streamlit anchor link icons globally for professional appearance
+**Related:** `notebooks/dashboard/dashboard_app.py` (Tab 3), ISSUE-016, DECISION-011
 
 ---
