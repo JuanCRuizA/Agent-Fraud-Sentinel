@@ -1067,7 +1067,7 @@ with tab5:
             ),
         },
     ])
-    st.dataframe(fl_data, use_container_width=True, hide_index=True)
+    st.table(fl_data)
     st.markdown(
         "**Overall Assessment:** No direct protected attributes used. "
         "Conduct disparate impact analysis when demographic data becomes available."
