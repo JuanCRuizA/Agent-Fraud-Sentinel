@@ -18,8 +18,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - [DECISION-008] Constrained Optimization with 75% Minimum Recall
 - [DECISION-009] Multi-Threshold Production Strategy
 - [DECISION-010] SHAP TreeExplainer for Model Explainability
-- [DECISION-011] Six Representative Case Studies for Local Explainability
-- [DECISION-012] Sidebar Radio Navigation Over st.tabs() for Dashboard
+- [DECISION-011] Five Representative Case Studies for Local Explainability
 - [DECISION-013] Slim Test Data for Streamlit Cloud Deployment
 - [DECISION-014] Bayesian Optimization (Optuna) Over Grid Search
 - [DECISION-015] LightGBM as Third Model for Gradient Boosting Comparison
@@ -28,6 +27,9 @@ Document key technical decisions, rationale, and alternatives considered during 
 
 ### Pending Review
 - None
+
+### Superseded
+- [DECISION-012] Sidebar Radio Navigation (superseded by DECISION-016)
 
 ### Rejected
 - None
@@ -69,7 +71,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Large dataset requires efficient processing strategies
 - Class imbalance needs careful handling (SMOTE, class weights, threshold tuning)
 - Multiple files need merging (transaction + identity)
-**Related:** `notebooks/01_eda_fraud_patterns.ipynb`
+**Related:** `notebooks/exploratory/01_eda_fraud_patterns.ipynb`
 
 ---
 
@@ -90,7 +92,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Adds one notebook to pipeline but significantly improves feature quality
 - Top 10 features saved to `data/processed/top_features.csv` for next stage
 - Clear understanding of 3.5% fraud rate informs threshold selection later
-**Related:** `notebooks/01_eda_fraud_patterns.ipynb`
+**Related:** `notebooks/exploratory/01_eda_fraud_patterns.ipynb`
 
 ---
 
@@ -105,7 +107,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Produces 90,375 unique clients from 590,540 transactions (avg 6.5 txns/client)
 - NaN handling: `addr1` filled with -1, `P_emaildomain` filled with 'unknown'
 **Alternatives Considered:**
-- `card1` alone: Too coarse — same card number used at different addresses could be different users
+- `card1` alone: Too coarse -- same card number used at different addresses could be different users
 - `card1 + card2 + addr1 + addr2`: Too fine-grained, many NaN combinations create fragmented groups
 - `TransactionID`-only analysis: Loses all behavioral/velocity patterns per customer
 **Consequences:**
@@ -120,13 +122,13 @@ Document key technical decisions, rationale, and alternatives considered during 
 ### [DECISION-004] Leakage-Free Feature Engineering with Backward-Only Windows
 **Date:** 2026-02-08
 **Status:** ✅ Implemented
-**Context:** Feature engineering for fraud detection must strictly avoid data leakage — no feature at time T should use information from time T+1 or later, as this would inflate model performance unrealistically.
+**Context:** Feature engineering for fraud detection must strictly avoid data leakage -- no feature at time T should use information from time T+1 or later, as this would inflate model performance unrealistically.
 **Decision:** Implement all features with backward-only lookback windows:
 - Velocity: `rolling('1H').count() - 1` (subtract 1 to exclude current row)
 - Amount deviation: `expanding().mean().shift(1)` (shift excludes current row)
 - First transaction: `cumcount().eq(0)` (inherently backward-looking)
 **Rationale:**
-- In production, a fraud model scores transactions in real-time — it cannot see future data
+- In production, a fraud model scores transactions in real-time -- it cannot see future data
 - `rolling()` in pandas looks backward by default but includes the current row, hence the `- 1`
 - `expanding().shift(1)` computes statistics over all prior rows, then shifts to exclude current
 - 6 automated leakage tests confirm correctness (all passed)
@@ -145,12 +147,12 @@ Document key technical decisions, rationale, and alternatives considered during 
 ### [DECISION-005] Temporal Train/Val/Test Split Over Random Stratified Split
 **Date:** 2026-02-08
 **Status:** ✅ Implemented
-**Context:** Need to split data for model training, validation, and testing. Fraud detection operates on time-ordered data — the model must predict future fraud based on past patterns.
+**Context:** Need to split data for model training, validation, and testing. Fraud detection operates on time-ordered data -- the model must predict future fraud based on past patterns.
 **Decision:** Temporal 60/20/20 split: sort by `TransactionDT`, then take first 60% as train, next 20% as validation, last 20% as test.
 **Rationale:**
 - Mirrors production deployment: model trained on past data, evaluated on future data
 - Prevents temporal leakage (training on data from the same period as test data)
-- Real fraud patterns evolve over time — temporal split tests for concept drift
+- Real fraud patterns evolve over time -- temporal split tests for concept drift
 - Fraud rates across splits will naturally vary, which is more realistic than forced stratification
 **Alternatives Considered:**
 - Random stratified split (sklearn `train_test_split`): Shuffles time order, creates leakage
@@ -200,15 +202,15 @@ Document key technical decisions, rationale, and alternatives considered during 
 **Context:** After training four models (Logistic Regression, XGBoost initial, XGBoost Bayesian, LightGBM Bayesian), need to select the best-performing model for production deployment. Winner is determined dynamically by PR-AUC on the validation set.
 **Decision:** Deploy LightGBM (Bayesian, 30 Optuna trials) as the production model (saved as `best_model_final.pkl`). XGBoost grid search model retained as `xgboost_final.pkl` for backwards compatibility with Phase 4/5 notebooks.
 **Rationale:**
-- **PR-AUC improvement**: LightGBM Bayesian (0.1126) outperforms LR (0.0821) by 37.1% and XGBoost grid search (0.1098) by 2.5%
-- **Fair comparison at threshold 0.5**: LightGBM Bayesian catches 62.3% of fraud (0.6229 recall) — highest of all four models
+- **PR-AUC improvement**: LightGBM Bayesian (0.1125) outperforms LR (0.0821) by 37.1% and XGBoost grid search (0.1098) by 2.5%
+- **Fair comparison at threshold 0.5**: LightGBM Bayesian catches 62.3% of fraud (0.6229 recall) -- highest of all four models
 - **Non-linear patterns**: Leaf-wise tree growth captures complex feature interactions better than level-wise XGBoost for this dataset
-- **Dynamic winner selection**: All downstream cells use `final_proba_val`/`final_proba_test` — if XGBoost Bayesian outperforms on a future run, it will be selected automatically
+- **Dynamic winner selection**: All downstream cells use `final_proba_val`/`final_proba_test` -- if XGBoost Bayesian outperforms on a future run, it will be selected automatically
 - **Industry standard**: LightGBM is widely used in production fraud detection systems alongside XGBoost
 **Alternatives Considered:**
 - Logistic Regression: Simpler and more interpretable, but lower PR-AUC (0.0821)
-- XGBoost (grid search, 6 trials): PR-AUC 0.1098 — good baseline but outperformed by Bayesian models
-- XGBoost (Bayesian, 30 trials): PR-AUC 0.1116 — close second; retained as `xgboost_final.pkl` for Phase 4/5 compatibility
+- XGBoost (grid search, 6 trials): PR-AUC 0.1098 -- good baseline but outperformed by Bayesian models
+- XGBoost (Bayesian, 30 trials): PR-AUC 0.1116 -- close second; retained as `xgboost_final.pkl` for Phase 4/5 compatibility
 - Neural Networks: Overkill for 7 features, harder to interpret, requires more data
 **Consequences:**
 - Winning model saved as `best_model_final.pkl` (LightGBM Bayesian, ~690KB)
@@ -231,14 +233,14 @@ Document key technical decisions, rationale, and alternatives considered during 
 - **Long-term cost**: Reputational damage and regulatory fines exceed short-term operational savings
 - **75% target**: Realistic balance between catching most fraud (76% actual) while controlling false positive costs
 **Alternatives Considered:**
-1. **Unconstrained optimization (threshold 0.720)**: 17.1% recall, $326K cost — rejected as unacceptable
+1. **Unconstrained optimization (threshold 0.720)**: 17.1% recall, $326K cost -- rejected as unacceptable
 2. **Higher recall targets (85-90%)**: Would require threshold ~0.25-0.30, causing FP explosion (100K+ false alarms)
 3. **Fixed threshold (0.5)**: Arbitrary choice, doesn't account for business costs (60.9% recall, moderate cost)
 **Consequences:**
 - **Threshold shifts**: From 0.720 (unconstrained) to 0.420 (constrained 75%)
 - **Recall improvement**: 17.1% → 76.6% (catches 2,743 additional frauds on validation set)
 - **Cost increase**: $326K → $578K (77.2% increase, or +$252K)
-- **Cost per additional fraud caught**: $91.87 (vs $75 median fraud amount — slightly negative ROI on cost alone)
+- **Cost per additional fraud caught**: $91.87 (vs $75 median fraud amount -- slightly negative ROI on cost alone)
 - **Trade-off justified**: Preventing $213K in fraud losses (2,840 frauds × $75) costs $270K, but includes intangible benefits (reputation, compliance)
 - **False positives**: 3,976 → 49,748 (12.5x increase, significant analyst workload)
 **Related:** `notebooks/modeling/03_model_training.ipynb` (Section 6)
@@ -248,11 +250,11 @@ Document key technical decisions, rationale, and alternatives considered during 
 ### [DECISION-009] Multi-Threshold Production Strategy Over Single Threshold
 **Date:** 2026-02-08 (updated 2026-03-02)
 **Status:** ✅ Implemented
-**Context:** Single threshold (0.410) achieves 75% recall but generates 51,524 manual reviews on validation set (46.6% of all transactions). This is operationally expensive and treats all flagged transactions equally, ignoring confidence levels.
+**Context:** Single threshold (0.420) achieves 75% recall but generates 51,524 manual reviews on validation set (46.6% of all transactions). This is operationally expensive and treats all flagged transactions equally, ignoring confidence levels.
 **Decision:** Implement three-tier strategy:
 - **Auto-block (score ≥ 0.90)**: Instant fraud block, $5 cost (automated processing)
 - **Manual review (0.420 ≤ score < 0.90)**: Human analyst review, $10 cost
-- **Auto-approve (score < 0.410)**: No review, $0 cost
+- **Auto-approve (score < 0.420)**: No review, $0 cost
 **Rationale:**
 - **Confidence-based triage**: High-confidence fraud (≥0.90) doesn't need human review
 - **Operational efficiency**: Reduces per-transaction cost for obvious fraud cases ($5 vs $10)
@@ -261,7 +263,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - **Realistic banking practice**: Real fraud systems use tiered decision rules, not binary threshold
 **Alternatives Considered:**
 - Single threshold (0.420): 76% recall but all flagged txns require manual review
-- Four-tier strategy: Adding "auto-approve-with-monitoring" tier (0.30-0.41) adds complexity without clear benefit
+- Four-tier strategy: Adding "auto-approve-with-monitoring" tier (0.30-0.42) adds complexity without clear benefit
 - Adaptive thresholds: Dynamic adjustment based on fraud rate trends (future enhancement)
 **Consequences:**
 - **Auto-block segment**: 8 transactions (0.01%), 1 fraud caught, 7 false positives, $35 cost
@@ -301,31 +303,30 @@ Document key technical decisions, rationale, and alternatives considered during 
 
 ---
 
-### [DECISION-011] Six Representative Case Studies for Local Explainability
+### [DECISION-011] Five Representative Case Studies for Local Explainability
 **Date:** 2026-02-09
 **Status:** ✅ Implemented
 **Context:** Global SHAP plots show overall patterns, but regulators and analysts need to see how the model explains *individual* transactions. Case studies must cover all possible model outcomes to demonstrate comprehensive explainability.
-**Decision:** Select 6 representative case studies covering the full spectrum of model decisions:
-1. **True Positive (clear)** — high score, actual fraud (auto-block)
-2. **True Positive (velocity-driven)** — moderate score, fraud detected through velocity signals
-3. **False Negative (missed)** — low score, actual fraud that the model failed to catch
-4. **False Positive (false alarm)** — high score on a legitimate transaction
-5. **Auto-block candidate** — score >= 0.90, demonstrating the auto-block tier
-6. **Borderline** — score near the manual review threshold (0.41)
+**Decision:** Select 5 representative case studies covering the full spectrum of model decisions:
+1. **True Positive (clear)** -- high score, actual fraud (auto-block)
+2. **True Positive (velocity-driven)** -- moderate score, fraud detected through velocity signals
+3. **False Negative (missed)** -- low score, actual fraud that the model failed to catch
+4. **False Positive (false alarm)** -- high score on a legitimate transaction (also demonstrates auto-block tier at score 0.9342)
+5. **Borderline** -- score near the manual review threshold (0.42)
 **Rationale:**
 - Covers all 4 confusion matrix quadrants (TP, FP, FN, TN-adjacent)
 - Demonstrates model strengths (Cases 1-2) AND limitations (Case 3)
-- Shows the cost of false alarms (Case 4) and the auto-block tier in action (Case 5)
-- Borderline case (Case 6) illustrates threshold sensitivity for threshold-tuning discussions
+- Shows the cost of false alarms and the auto-block tier in action (Case 4, score 0.9342)
+- Borderline case (Case 5) illustrates threshold sensitivity for threshold-tuning discussions
 - Each case includes plain-English explanation suitable for customer disputes
 **Alternatives Considered:**
 - Random sample of transactions: Would not guarantee coverage of all outcome types
 - Only positive examples (TP): Would hide model limitations from regulators
 - Customer-facing examples only: Would miss internal operational insights
 **Consequences:**
-- Cases 4 and 5 happen to be the same transaction (score 0.9342, legitimate) — this was not engineered but reflects the data reality that very few transactions score above 0.90
+- Case 4 (False Positive, score 0.9342) doubles as an auto-block demonstration -- very few legitimate transactions score above 0.90
 - Case 3 (missed fraud, score 0.0853) reveals the model's primary weakness: fraudsters with zero velocity and normal amounts evade detection
-- All 6 cases documented with transaction features, SHAP waterfall plots, and risk driver bullet points
+- All 5 cases documented with transaction features, SHAP waterfall plots, and risk driver bullet points
 - Reused in Phase 5 dashboard (Tab 3: Case Study Explorer)
 **Related:** `notebooks/modeling/04_shap_explainability.ipynb` (Cells 16-22), `notebooks/dashboard/dashboard_app.py` (Case Study Explorer tab)
 
@@ -334,12 +335,12 @@ Document key technical decisions, rationale, and alternatives considered during 
 ### [DECISION-012] Sidebar Radio Navigation Over st.tabs() for Dashboard
 **Date:** 2026-02-09
 **Status:** ❌ Superseded by DECISION-016
-**Context:** The Streamlit dashboard needs clear navigation across 4 content areas (Executive Summary, Model Performance, Case Study Explorer, Regulatory Compliance). Streamlit offers both `st.tabs()` and `st.sidebar.radio()` as navigation patterns.
+**Context:** The Streamlit dashboard needs clear navigation across 4 content areas (Executive Summary, Model Comparison, Case Study Explorer, Regulatory Compliance). Streamlit offers both `st.tabs()` and `st.sidebar.radio()` as navigation patterns.
 **Decision:** Use `st.sidebar.radio()` for page navigation, with each page rendered conditionally in the main area.
 **Rationale:**
 - **Persistent controls**: Sidebar keeps global filters (threshold slider, sample size) always visible regardless of which page is active
 - **Professional banking aesthetic**: Sidebar navigation is standard in enterprise dashboards
-- **Branding space**: Sidebar provides dedicated space for "BAFS" branding, About & Methods expander
+- **Branding space**: Sidebar provides dedicated space for "SAFE" branding, About & Methods expander
 - **Footer consistency**: Each page can independently render the complete footer at its bottom
 - **Clean URL**: Radio navigation doesn't add tab state to the URL, keeping the app URL clean
 **Alternatives Considered:**
@@ -398,7 +399,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Bayesian tuning takes ~5-10 minutes per model (30 trials x ~10-20 seconds each)
 - Best params stored in `study_xgb.best_params` and `study_lgb.best_params` (Optuna study objects)
 - XGBoost Bayesian PR-AUC: 0.1116 vs grid search 0.1098 (+1.6% improvement)
-- LightGBM Bayesian PR-AUC: 0.1126 (no grid search baseline for comparison)
+- LightGBM Bayesian PR-AUC: 0.1125 (no grid search baseline for comparison)
 - Grid search section retained as 6.1 for pedagogical comparison
 **Related:** `notebooks/modeling/03_model_training.ipynb` (Section 6.2), DECISION-015
 
@@ -423,7 +424,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Section 5 added (LightGBM initial training, 3 cells)
 - Section 6.2 runs Optuna for both XGBoost and LightGBM (adds ~10 minutes to total runtime)
 - 4-model comparison table in Section 7 provides clear winner narrative
-- LightGBM Bayesian wins current run (PR-AUC 0.1126 vs 0.1116 XGBoost Bayesian)
+- LightGBM Bayesian wins current run (PR-AUC 0.1125 vs 0.1116 XGBoost Bayesian)
 - No changes needed to Phase 4 (SHAP) or Phase 5 (dashboard) since they load by filename
 **Related:** `notebooks/modeling/03_model_training.ipynb` (Section 5, Section 6.2, Section 7), DECISION-014
 
@@ -445,7 +446,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Multi-page app (`pages/` directory): More complex file structure; harder to maintain for a portfolio prototype
 - Combined sidebar radio + tabs: Redundant navigation, confusing UX
 **Consequences:**
-- Sidebar now contains only: BAFS branding, threshold slider, sample size selector, export button, About & Methods expander
+- Sidebar now contains only: SAFE branding, threshold slider, sample size selector, export button, About & Methods expander
 - `render_footer()` still called at the bottom of every tab for consistency
 - Tab state is not preserved across browser refresh (acceptable for a portfolio demo)
 - DECISION-012 (sidebar radio) is superseded

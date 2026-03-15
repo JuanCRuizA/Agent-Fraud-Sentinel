@@ -984,7 +984,8 @@ with tab5:
 &nbsp;&nbsp;2. <a href="#fair-lending-review">Fair Lending Considerations</a><br>
 &nbsp;&nbsp;3. <a href="#model-governance-framework">Model Governance Framework</a><br>
 &nbsp;&nbsp;4. <a href="#right-to-explanation">Right-to-Explanation Capabilities</a><br>
-&nbsp;&nbsp;5. <a href="#data-lineage-audit-trail">Data Lineage and Audit Trail</a>
+&nbsp;&nbsp;5. <a href="#data-lineage-audit-trail">Data Lineage and Audit Trail</a><br>
+&nbsp;&nbsp;6. <a href="#swiss-eu-regulatory-alignment">Swiss & European Regulatory Alignment</a>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1167,6 +1168,100 @@ with tab5:
         "- Retention: minimum 7 years (regulatory requirement)\n"
         "- Log fields: transaction_id, fraud_score, threshold, decision, "
         "SHAP values, model_version, timestamp"
+    )
+
+    st.markdown("[Back to top](#compliance-top)")
+    st.markdown("---")
+
+    # ── Section 6: Swiss & European Regulatory Alignment ──────────────
+    st.subheader(
+        "6. Swiss & European Regulatory Alignment",
+        anchor="swiss-eu-regulatory-alignment",
+    )
+
+    st.markdown(
+        "Fraud detection models deployed in Swiss and European banking "
+        "environments must satisfy additional regulatory requirements beyond "
+        "U.S. SR 11-7 guidance. The table below maps each domestic requirement "
+        "to its Swiss/EU equivalent and documents SAFE's current alignment."
+    )
+
+    reg_data = pd.DataFrame([
+        {
+            "U.S. Requirement": "SR 11-7 Model Risk Management",
+            "Swiss/EU Equivalent": "FINMA Circular 2017/1 (Operational Risks)",
+            "SAFE Status": "Aligned",
+            "Notes": (
+                "FINMA Circular 2017/1 requires banks to identify, measure, "
+                "and control operational risks, including model risk. "
+                "SAFE's documentation, validation, and monitoring framework "
+                "satisfies both SR 11-7 and FINMA requirements."
+            ),
+        },
+        {
+            "U.S. Requirement": "GDPR Article 22 (Automated Decisions)",
+            "Swiss/EU Equivalent": "Swiss nDSG Art. 21 (Automated Decisions)",
+            "SAFE Status": "Aligned",
+            "Notes": (
+                "The revised Swiss Federal Act on Data Protection (nDSG, "
+                "effective Sep 2023) mirrors GDPR Article 22: data subjects "
+                "can request human review of automated decisions with legal "
+                "effects. SAFE's SHAP-based right-to-explanation and manual "
+                "review tier (0.42-0.90) provide this mechanism."
+            ),
+        },
+        {
+            "U.S. Requirement": "Fair Lending (ECOA / Reg B)",
+            "Swiss/EU Equivalent": "Swiss Federal Constitution Art. 8 (Equality)",
+            "SAFE Status": "Partial",
+            "Notes": (
+                "Switzerland's constitutional equality guarantee applies to "
+                "algorithmic decisions. SAFE uses no protected attributes; "
+                "disparate impact testing is pending demographic data "
+                "availability."
+            ),
+        },
+        {
+            "U.S. Requirement": "N/A (no U.S. equivalent yet)",
+            "Swiss/EU Equivalent": "EU AI Act (2024) - High-Risk Classification",
+            "SAFE Status": "Aligned",
+            "Notes": (
+                "The EU AI Act classifies AI systems used in creditworthiness "
+                "assessment and fraud detection as high-risk (Annex III). "
+                "High-risk systems must provide: transparency documentation, "
+                "human oversight, accuracy/robustness metrics, and logging. "
+                "SAFE satisfies all four through its SHAP explanations, "
+                "manual review tier, documented performance metrics, and "
+                "audit trail."
+            ),
+        },
+        {
+            "U.S. Requirement": "Basel III / OCC Guidance",
+            "Swiss/EU Equivalent": "Basel III/IV via FINMA (Swiss implementation)",
+            "SAFE Status": "Aligned",
+            "Notes": (
+                "Switzerland implements Basel III/IV through FINMA circulars. "
+                "SAFE's operational risk framework (model governance, "
+                "monitoring schedule, Tier 2 classification) satisfies "
+                "Basel capital adequacy requirements for model risk."
+            ),
+        },
+    ])
+    st.table(reg_data)
+
+    st.markdown("**Key Takeaways for Swiss Deployment:**")
+    st.markdown(
+        "1. **FINMA readiness:** SAFE's model governance framework "
+        "(Section 3) maps directly to FINMA Circular 2017/1 requirements "
+        "for operational risk management in AI/ML models.\n"
+        "2. **nDSG compliance:** The right-to-explanation capability "
+        "(Section 4) and human-in-the-loop review tier satisfy Swiss data "
+        "protection requirements for automated decision-making.\n"
+        "3. **EU AI Act preparedness:** As a high-risk AI system under "
+        "Annex III, SAFE already implements the required transparency, "
+        "oversight, and logging mechanisms.\n"
+        "4. **Pending:** Disparate impact testing requires demographic data "
+        "not available in the IEEE-CIS dataset."
     )
 
     st.markdown("[Back to top](#compliance-top)")

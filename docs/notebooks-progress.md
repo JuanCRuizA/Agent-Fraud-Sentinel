@@ -103,7 +103,7 @@
 
 ### Key Findings
 - **Velocity signal**: fraud rate jumps from 2.9% (0 prior txns) to 10.8%+ at high velocity (peaking at 11.4% for 6-10 txns/hr)
-- **Amount deviation**: positive Z-scores show strongest fraud signal — spending *above* client average peaks at 5.2% fraud rate (Z-score 1 to 2), compared to 2.3% for extreme low deviations
+- **Amount deviation**: positive Z-scores show strongest fraud signal -- spending *above* client average peaks at 5.2% fraud rate (Z-score 1 to 2), compared to 2.3% for extreme low deviations
 - **Returning customers**: higher fraud rate (3.67%) than first-time transactions (2.53%), suggesting compromised accounts are a key fraud vector
 - **Temporal**: early morning hours and weekends show elevated fraud
 - **Large amounts**: highest fraud rate at 4.41% (>$200), followed by small at 3.83% (<$50), with medium lowest at 2.97% ($50-$200)
@@ -179,21 +179,21 @@
 | Baseline (Logistic) | 0.0821 | 0.0693 | 0.4279 | 0.1193 |
 | XGBoost (grid search) | 0.1098 | 0.0813 | 0.6085 | 0.1435 |
 | XGBoost (Bayesian) | 0.1116 | 0.0806 | 0.6194 | 0.1426 |
-| LightGBM (Bayesian) | 0.1126 | 0.0844 | 0.6229 | 0.1486 |
+| LightGBM (Bayesian) | 0.1125 | 0.0844 | 0.6229 | 0.1486 |
 
-- **LightGBM (Bayesian) wins** with PR-AUC 0.1126 (37.1% improvement over baseline)
+- **LightGBM (Bayesian) wins** with PR-AUC 0.1125 (37.1% improvement over baseline)
 - Bayesian optimization (30 trials) outperforms grid search (6 trials) for both models
 - LightGBM leaf-wise growth provides best PR-AUC and highest recall at 0.5 (0.6229)
 
 **Threshold Optimization (based on winning model):**
 - **Pure cost minimization**: threshold 0.720, 17.1% recall, $326K cost (unacceptable for production)
-- **Constrained optimization (75% recall floor)**: threshold 0.410, actual recall 76.6%, $578K validation cost (+77.2%)
+- **Constrained optimization (75% recall floor)**: threshold 0.420, actual recall 76.6%, $578K validation cost (+77.2%)
 - **Test set (unbiased)**: 73.8% recall, cost $730,482 ($6.18/txn) -- LightGBM Bayesian at threshold 0.420
 
 **Production Strategy (Multi-Threshold):**
 - **Auto-block (>=0.90)**: high-confidence fraud, automated processing
-- **Manual review (0.41-0.90)**: human analyst queue
-- **Auto-approve (<0.41)**: no review needed
+- **Manual review (0.420-0.90)**: human analyst queue
+- **Auto-approve (<0.420)**: no review needed
 - All downstream cells dynamically use winner model probabilities (`final_proba_val`, `final_proba_test`)
 
 ### Key Technical Decisions
@@ -256,7 +256,7 @@
 - Global feature importance (SHAP summary and bar charts)
 - Local transaction-level explanations (waterfall plots, plain English)
 - Business insights for fraud operations
-- Regulatory compliance documentation (SR 11-7, fair lending, right-to-explanation)
+- Regulatory compliance documentation (SR 11-7, fair lending, right-to-explanation, FINMA, nDSG, EU AI Act)
 
 ### Notebook Structure
 
@@ -297,7 +297,7 @@
 |------|------|-------|--------|-------------|
 | 1 | True Positive (clear) | 0.9094 | Fraud | Multiple strong indicators, auto-blocked |
 | 2 | True Positive (velocity) | 0.7332 | Fraud | Velocity features drove detection |
-| 3 | False Negative | 0.0853 | Fraud | All features appeared normal — model limitation |
+| 3 | False Negative | 0.0853 | Fraud | All features appeared normal -- model limitation |
 | 4 | False Positive | 0.9342 | Legit | Card-testing pattern on legitimate purchase |
 | 5 | Auto-Block candidate | 0.9342 | Legit | High-confidence false alarm |
 | 6 | Borderline | 0.3648 | Legit | Near threshold, demonstrates sensitivity |
@@ -307,7 +307,7 @@
 - **Spending anomaly score** and **time of day** provide strong secondary signals
 - **First-time transactions** carry higher uncertainty but lower overall importance
 - High-value SHAP contributions are concentrated in velocity + amount features for auto-block tier
-- Missed frauds (FN) consistently show zero velocity and normal amounts — model limitation
+- Missed frauds (FN) consistently show zero velocity and normal amounts -- model limitation
 
 ### Regulatory Documentation Completed
 - [x] SR 11-7 model documentation (purpose, inputs, outputs, assumptions, limitations)
@@ -327,7 +327,7 @@
 **Date:** 2026-02-09 (updated 2026-02-10)
 **Status:** ✅ Completed (18 cells) + deployed to Streamlit Cloud
 **Location:** `notebooks/dashboard/05_streamlit_dashboard.ipynb`
-**Objective:** Build a professional, interactive dashboard for fraud detection analytics, model explainability, and regulatory compliance — targeting a Data Scientist portfolio for banking roles.
+**Objective:** Build a professional, interactive dashboard for fraud detection analytics, model explainability, and regulatory compliance -- targeting a Data Scientist portfolio for banking roles.
 
 ### Dashboard Architecture
 
@@ -335,9 +335,9 @@
 +------------------+---------------------------------------------+
 | SIDEBAR          | MAIN AREA (st.tabs horizontal navigation)   |
 |                  |                                             |
-| BAFS             | [Tab 1] Executive Summary                   |
-| Banking Anti-    |   - KPI cards, risk distribution, costs     |
-| Fraud System     |                                             |
+| SAFE             | [Tab 1] Executive Summary                   |
+| System for Anti- |   - KPI cards, risk distribution, costs     |
+| Fraud Evaluation |                                             |
 |                  | [Tab 2] Model Comparison                    |
 | Threshold slider |   - Journey table, PR/ROC, confusion matrix |
 | Sample size      |                                             |
@@ -348,7 +348,7 @@
 |                  |   - Flagged watchlist, transaction history  |
 |                  |                                             |
 |                  | [Tab 5] Regulatory Compliance               |
-|                  |   - SR 11-7, fair lending, audit trail      |
+|                  |   - SR 11-7, fair lending, Swiss/EU regs    |
 |                  |                                             |
 |                  | [FOOTER on every tab]                       |
 +------------------+---------------------------------------------+
@@ -360,20 +360,20 @@
 |---------|---------|
 | 1. Setup & Dependencies | Verify packages (lightgbm) and model artifacts (best_model_final.pkl) |
 | 2. Dashboard Architecture | Layout diagram, file dependencies, design principles |
-| 3. Streamlit Application | `%%writefile dashboard_app.py` -- complete app (~1,100 lines) |
+| 3. Streamlit Application | `%%writefile dashboard_app.py` -- complete app (~1,270 lines) |
 | 4. Tab Design Documentation | Design rationale for all 5 tabs + code cell parsing journey data from app |
 | 5. Deployment | `requirements.txt` (lightgbm), local run instructions, Streamlit Cloud notes |
 | Summary | Features table, interactive controls, production readiness checklist |
 
 ### Tab Content
 
-**Tab 1 — Executive Summary:**
+**Tab 1 -- Executive Summary:**
 - 4 KPI cards: Fraud Detected, FPR, Fraud Prevented ($), Total Cost
 - Performance table (recall, precision, F1, FPR, threshold)
 - Risk score distribution histogram (fraud vs legitimate with threshold line)
 - Cost analysis: missed fraud cost ($227/FN), false alarm cost ($10/FP), savings vs no-model baseline
 
-**Tab 2 — Model Comparison:**
+**Tab 2 -- Model Comparison:**
 - Optimization journey table (4-stage: No Model -> LightGBM winner)
 - PR curve comparison (pre-computed image) + cost vs threshold image
 - Live confusion matrix with cost overlay ($227 FN, $10 FP), updates with threshold slider
@@ -381,7 +381,7 @@
 - SHAP feature importance bar chart (from Phase 4)
 - Cost-benefit analysis table across 8 threshold values
 
-**Tab 3 — Case Study Explorer:** (updated 2026-03-13)
+**Tab 3 -- Case Study Explorer:** (updated 2026-03-13)
 - Dropdown to select from 5 case studies (TP clear, TP velocity, FN missed, FP false alarm, Borderline)
 - Transaction features in human-readable format
 - Individual SHAP waterfall plot per case (fallback to 6-panel grid)
@@ -389,19 +389,20 @@
 - Dynamic section titles per case type: "Key Risk Drivers" (TP), "Key Factors in Missed Detection" (FN), "Key Factors in False Alert" (FP), "Key Factors in Correct Approval" (TN)
 - Driver bullet points ordered by absolute SHAP magnitude with SHAP values included
 
-**Tab 4 — Client Risk Profile:**
+**Tab 4 -- Client Risk Profile:**
 - Minimum risk score filter + sort-by selector
 - Flagged client watchlist with risk level badge (auto-block / review / low)
 - Client summary: total txns, max score, confirmed fraud count, total amount
 - Transaction history table + fraud score bar chart
 
-**Tab 5 — Regulatory Compliance:**
+**Tab 5 -- Regulatory Compliance:**
 - HTML table of contents with anchor links
 - SR 11-7 checklist (8 completed, 4 pending)
 - Fair lending review (5 features assessed)
 - Model governance framework (identification, risk tier, monitoring schedule)
 - Right-to-explanation and dispute resolution workflow
 - Data lineage and audit trail documentation
+- Swiss/EU regulatory alignment (FINMA Circular 2017/1, nDSG Art. 21, EU AI Act)
 
 ### Interactive Controls
 
@@ -417,7 +418,7 @@
 
 | File | Description |
 |------|-------------|
-| `notebooks/dashboard/dashboard_app.py` | Standalone Streamlit application (~600 lines) |
+| `notebooks/dashboard/dashboard_app.py` | Standalone Streamlit application (~1,270 lines) |
 | `notebooks/dashboard/requirements.txt` | Python dependencies for deployment |
 | `notebooks/dashboard/test_dashboard.csv` | Slim test data (8 columns, 8.3 MB) for Streamlit Cloud |
 
@@ -434,9 +435,9 @@
 - All metrics use actual model outputs (no placeholder data)
 
 ### Issues Encountered & Resolved
-- [ISSUE-009] `use_container_width` deprecation warning — replaced with `width="stretch"`
-- [ISSUE-010] Streamlit Cloud FileNotFoundError — model and data files excluded by `.gitignore`
-- [ISSUE-011] Test CSV too large for GitHub (145 MB) — created slim 8.3 MB version
-- [ISSUE-016] Tab 3 narratives contradicted SHAP plots — rewrote all 5 cases with SHAP-aligned text and dynamic section titles
+- [ISSUE-009] `use_container_width` deprecation warning -- replaced with `width="stretch"`
+- [ISSUE-010] Streamlit Cloud FileNotFoundError -- model and data files excluded by `.gitignore`
+- [ISSUE-011] Test CSV too large for GitHub (145 MB) -- created slim 8.3 MB version
+- [ISSUE-016] Tab 3 narratives contradicted SHAP plots -- rewrote all 5 cases with SHAP-aligned text and dynamic section titles
 
 ---

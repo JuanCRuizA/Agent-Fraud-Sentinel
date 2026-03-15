@@ -109,7 +109,7 @@ print(f"Manual review threshold: >= {manual_threshold:.3f}")
 **Status:** ✅ Resolved
 **Severity:** 🟡 Medium
 **Problem:** User confused why baseline model showed 42.79% recall at threshold 0.5, XGBoost initial showed 61.05%, but "final" XGBoost only showed 14.42% recall at threshold 0.740.
-**Root Cause:** Comparing models at different thresholds (0.5 vs 0.740) is misleading — it conflates two separate decisions: (1) which model is best, and (2) what threshold to use.
+**Root Cause:** Comparing models at different thresholds (0.5 vs 0.740) is misleading -- it conflates two separate decisions: (1) which model is best, and (2) what threshold to use.
 **Solution:** Added Cell 26 (markdown explanation of "TWO SEPARATE STEPS") and Cell 28 (fair comparison showing all models at threshold 0.5). Clearly separated model selection (use PR-AUC) from threshold optimization (use cost analysis).
 **Prevention:** Always compare models at the same threshold first. Document that threshold selection is a separate business decision applied AFTER choosing the best model.
 
@@ -182,7 +182,7 @@ print(f"Manual review threshold: >= {manual_threshold:.3f}")
 **Solution:** Added explicit computations at the top of the comparison cell:
 - Logistic Regression: `baseline_pred_05 = (baseline_proba_val >= 0.5).astype(int)` then `precision_score / recall_score / f1_score`
 - XGBoost grid search: `final_pred_05 = (final_xgb_proba_val >= 0.5).astype(int)` then same pattern
-**Prevention:** When writing cells that reference variables as "already computed", verify the exact variable names from the source cells. Do not assume naming conventions — check the actual code.
+**Prevention:** When writing cells that reference variables as "already computed", verify the exact variable names from the source cells. Do not assume naming conventions -- check the actual code.
 
 ---
 
@@ -190,7 +190,7 @@ print(f"Manual review threshold: >= {manual_threshold:.3f}")
 **Date:** 2026-02-19
 **Status:** ✅ Resolved
 **Severity:** 🔴 Critical
-**Problem:** After adding dynamic winner selection in Section 7 (LightGBM Bayesian won with PR-AUC 0.1133), all downstream results (threshold optimization, constrained optimization, production strategy, confusion matrices) were identical to the original XGBoost notebook. The winner selection had no effect.
+**Problem:** After adding dynamic winner selection in Section 7 (LightGBM Bayesian won with PR-AUC 0.1125), all downstream results (threshold optimization, constrained optimization, production strategy, confusion matrices) were identical to the original XGBoost notebook. The winner selection had no effect.
 **Root Cause:** 8 cells (39, 41, 42, 43, 44, 45, 46, 47) in Sections 7-8 still referenced `final_xgb_proba_val` and `final_xgb_proba_test` directly instead of the dynamic winner variables `final_proba_val` and `final_proba_test` set by the winner selection cell. The plan assumed these cells would "automatically" use the winner, but they contained hardcoded XGBoost variable names.
 **Solution:** Bulk replacement across all 8 cells: `final_xgb_proba_val` → `final_proba_val`, `final_xgb_proba_test` → `final_proba_test`. Verified zero remaining occurrences after fix.
 **Prevention:** When implementing dynamic model selection, immediately audit ALL downstream cells for hardcoded model-specific variable references. Variable naming conventions alone do not guarantee correct wiring.
