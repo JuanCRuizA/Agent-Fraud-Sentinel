@@ -35,7 +35,7 @@ An end-to-end fraud detection system built on the IEEE-CIS dataset (590K transac
 | 2. Feature Engineering | `02_feature_engineering.ipynb` | 7 leakage-free features across 4 tiers (velocity, behavioral, temporal, categorical) |
 | 3. Model Training | `03_model_training.ipynb` | Logistic Regression baseline, XGBoost and LightGBM with Bayesian optimization, cost-sensitive threshold optimization |
 | 4. Explainability | `04_shap_explainability.ipynb` | SHAP TreeExplainer, 5 case studies, SR 11-7 regulatory documentation |
-| 5. Dashboard | `05_streamlit_dashboard.ipynb` | Interactive Streamlit app with 5 tabs, deployed to Streamlit Cloud |
+| 5. Dashboard | `05_streamlit_dashboard.ipynb` | Interactive Streamlit app with 5 tabs (includes FINMA, nDSG, EU AI Act alignment), deployed to Streamlit Cloud |
 
 ---
 
