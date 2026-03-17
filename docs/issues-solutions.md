@@ -207,3 +207,14 @@ print(f"Manual review threshold: >= {manual_threshold:.3f}")
 **Prevention:** When writing case study narratives for explainable AI dashboards, always derive text directly from model outputs (SHAP values). Cross-reference narrative claims against the actual feature attributions before publishing.
 
 ---
+
+### [ISSUE-017] KPI Card 1 Duplicates Fraud Prevented Instead of Showing Net Savings
+**Date:** 2026-03-17
+**Status:** ✅ Resolved
+**Severity:** 🟡 Medium
+**Problem:** The Executive Summary (Tab 1) had two KPI cards showing the same $680K value. Card 1 ("Fraud Savings vs No Model") and Card 3 ("Fraud Prevented") were both displaying `tp * FN_COST` ($680,546). The intended first card should show net savings ($192,046) -- the actual bottom-line impact of deploying the model.
+**Root Cause:** The calculation `savings = no_model - missed_fraud` simplifies to `(total_fraud - fn) * FN_COST = tp * FN_COST`, which is identical to `fraud_prevented`. The correct net savings formula is `no_model - total_cost` ($922,528 - $730,482 = $192,046).
+**Solution:** Changed card 1 from `savings = no_model - missed_fraud` to `net_savings = no_model - total_cost`, and renamed the label from "Fraud Savings vs No Model" to "Net Savings vs No Model". Updated both `dashboard_app.py` and `05_streamlit_dashboard.ipynb`.
+**Prevention:** When building KPI dashboards, verify each card shows a mathematically distinct metric. Cross-check by computing values manually before deploying.
+
+---

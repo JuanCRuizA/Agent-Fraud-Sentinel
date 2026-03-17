@@ -1,6 +1,6 @@
 # SAFE - System for Anti-Fraud Evaluation
 
-An end-to-end fraud detection system built on the IEEE-CIS dataset (590K transactions), featuring cost-sensitive LightGBM modeling with Bayesian optimization, SHAP explainability for regulatory compliance (SR 11-7, FINMA, EU AI Act), and a deployed interactive dashboard.
+An end-to-end fraud detection system built on the **IEEE-CIS dataset** (590,540 transactions, 3.50% fraud rate, 1:27 class imbalance), featuring cost-sensitive LightGBM modeling with Bayesian optimization, SHAP explainability for regulatory compliance (SR 11-7, FINMA, EU AI Act), and a deployed interactive dashboard.
 
 **[Live Dashboard](https://bankingantifraudsystem.streamlit.app)**
 
@@ -10,7 +10,6 @@ An end-to-end fraud detection system built on the IEEE-CIS dataset (590K transac
 
 | Metric | Value |
 |--------|-------|
-| Dataset | 590,540 transactions, 3.50% fraud rate (1:27 imbalance) |
 | Model | LightGBM with Bayesian optimization (Optuna, 30 trials) |
 | Recall | 73.8% (catches 3 out of 4 frauds) |
 | PR-AUC | 0.1125 (37.0% improvement over Logistic Regression baseline) |

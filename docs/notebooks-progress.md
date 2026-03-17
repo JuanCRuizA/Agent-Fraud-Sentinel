@@ -368,7 +368,7 @@
 ### Tab Content
 
 **Tab 1 -- Executive Summary:**
-- 4 KPI cards: Fraud Detected, FPR, Fraud Prevented ($), Total Cost
+- 4 KPI cards: Net Savings vs No Model, Fraud Detected, Fraud Prevented ($), Total Operational Cost
 - Performance table (recall, precision, F1, FPR, threshold)
 - Risk score distribution histogram (fraud vs legitimate with threshold line)
 - Cost analysis: missed fraud cost ($227/FN), false alarm cost ($10/FP), savings vs no-model baseline
@@ -439,5 +439,6 @@
 - [ISSUE-010] Streamlit Cloud FileNotFoundError -- model and data files excluded by `.gitignore`
 - [ISSUE-011] Test CSV too large for GitHub (145 MB) -- created slim 8.3 MB version
 - [ISSUE-016] Tab 3 narratives contradicted SHAP plots -- rewrote all 5 cases with SHAP-aligned text and dynamic section titles
+- [ISSUE-017] KPI card 1 duplicated Fraud Prevented ($680K) instead of Net Savings ($192K) -- fixed formula to `no_model - total_cost`
 
 ---

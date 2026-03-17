@@ -302,10 +302,10 @@ with tab1:
     total_cost = missed_fraud + review_cost
 
     no_model = total_fraud * FN_COST
-    savings = no_model - missed_fraud
+    net_savings = no_model - total_cost
 
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Fraud Savings vs No Model", f"${savings:,.0f}", f"${no_model:,.0f} baseline")
+    k1.metric("Net Savings vs No Model", f"${net_savings:,.0f}", f"${no_model:,.0f} baseline")
     k2.metric("Fraud Detected", f"{tp:,} / {total_fraud:,}", f"{recall:.1%} recall")
     k3.metric("Fraud Prevented", f"${fraud_prevented:,.0f}", f"{tp:,} transactions blocked")
     k4.metric(
