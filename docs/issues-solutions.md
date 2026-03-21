@@ -208,6 +208,17 @@ print(f"Manual review threshold: >= {manual_threshold:.3f}")
 
 ---
 
+### [ISSUE-018] FINMA Circular Number Incorrect in Dashboard and Notebook 05
+**Date:** 2026-03-21
+**Status:** ✅ Resolved
+**Severity:** 🟡 Medium
+**Problem:** Tab 5 of the dashboard and notebook 05 referenced "FINMA Circular 2017/1" in the Swiss/EU regulatory alignment table and key takeaways text. FINMA Circular 2017/1 covers a different topic; the correct reference for operational risk and model governance is FINMA Circular 2023/1.
+**Root Cause:** Incorrect circular number was used when Tab 5 was first authored (Feb 2026). The error was carried over from `dashboard_app.py` into `05_streamlit_dashboard.ipynb`.
+**Solution:** Replaced all three occurrences of 2017/1 with 2023/1 in `dashboard_app.py` and all four occurrences across cells 6 and 17 of `05_streamlit_dashboard.ipynb`.
+**Prevention:** When citing specific regulatory circulars, verify the number against the official FINMA website. Operational risk / model governance falls under Circular 2023/1, not the earlier 2017/1 circular.
+
+---
+
 ### [ISSUE-017] KPI Card 1 Duplicates Fraud Prevented Instead of Showing Net Savings
 **Date:** 2026-03-17
 **Status:** ✅ Resolved

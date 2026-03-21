@@ -132,7 +132,7 @@
 
 ## 03_model_training.ipynb
 
-**Date:** 2026-02-08 (updated 2026-02-19)
+**Date:** 2026-02-08 (updated 2026-03-21)
 **Status:** ✅ Completed (51 cells)
 **Location:** `notebooks/modeling/03_model_training.ipynb`
 **Objective:** Train and evaluate machine learning models for real-time fraud detection with production-ready threshold optimization.
@@ -187,13 +187,13 @@
 
 **Threshold Optimization (based on winning model):**
 - **Pure cost minimization**: threshold 0.720, 17.1% recall, $326K cost (unacceptable for production)
-- **Constrained optimization (75% recall floor)**: threshold 0.420, actual recall 76.6%, $578K validation cost (+77.2%)
-- **Test set (unbiased)**: 73.8% recall, cost $730,482 ($6.18/txn) -- LightGBM Bayesian at threshold 0.420
+- **Constrained optimization (75% recall floor)**: threshold 0.410, actual recall 76.6%, $578K validation cost (+77.2%)
+- **Test set (unbiased)**: 73.8% recall, cost $730,482 ($6.18/txn) -- LightGBM Bayesian at threshold 0.410
 
 **Production Strategy (Multi-Threshold):**
 - **Auto-block (>=0.90)**: high-confidence fraud, automated processing
-- **Manual review (0.420-0.90)**: human analyst queue
-- **Auto-approve (<0.420)**: no review needed
+- **Manual review (0.410-0.90)**: human analyst queue
+- **Auto-approve (<0.410)**: no review needed
 - All downstream cells dynamically use winner model probabilities (`final_proba_val`, `final_proba_test`)
 
 ### Key Technical Decisions
@@ -212,7 +212,7 @@
 - `models/scaler.pkl` - StandardScaler fitted on training data only
 - `models/threshold_config.pkl` - Production configuration:
   - `auto_block_threshold`: 0.90 (high confidence fraud)
-  - `manual_review_threshold`: 0.420 (75% recall target)
+  - `manual_review_threshold`: 0.410 (75% recall target)
   - `min_recall_target`: 0.75
   - `winning_model`: name of winning algorithm
   - Cost parameters and feature list included
@@ -247,7 +247,7 @@
 
 ## 04_shap_explainability.ipynb
 
-**Date:** 2026-02-09
+**Date:** 2026-02-09 (updated 2026-03-21)
 **Status:** ✅ Completed (38 cells)
 **Location:** `notebooks/modeling/04_shap_explainability.ipynb`
 **Objective:** Explain LightGBM fraud predictions so fraud analysts, business stakeholders, and regulators understand *why* the model flags or approves each transaction.
@@ -256,7 +256,7 @@
 - Global feature importance (SHAP summary and bar charts)
 - Local transaction-level explanations (waterfall plots, plain English)
 - Business insights for fraud operations
-- Regulatory compliance documentation (SR 11-7, fair lending, right-to-explanation, FINMA, nDSG, EU AI Act)
+- Regulatory compliance documentation (SR 11-7, OCC 2011-12, FINMA 2023/1, nDSG, EU AI Act, fair lending, right-to-explanation)
 
 ### Notebook Structure
 
@@ -275,10 +275,10 @@
 | 4. Business Insights | Fraud vs legitimate SHAP comparison + risk tier decomposition |
 | Actionable Insights | 5 operational recommendations for fraud teams |
 | 5. Regulatory Compliance | SR 11-7 documentation, fair lending review, audit trail |
-| 5.1 Model Documentation | Full model card (inputs, outputs, assumptions, performance) |
+| 5.1 Model Documentation | Full model card (inputs, outputs, assumptions, performance); all applicable frameworks (SR 11-7, OCC 2011-12, FINMA 2023/1) |
 | 5.2 Fair Lending | Feature-by-feature protected attribute assessment |
-| 5.3 Right to Explanation | Explainability mandate, dispute resolution workflow |
-| 5.4 Governance Summary | Checklist (8 done, 5 pending), monitoring schedule |
+| 5.3 Right to Explanation | GDPR Art. 22, nDSG Art. 21, EU AI Act Art. 13/14; human oversight paragraph; dispute resolution workflow; 7/10-year retention |
+| 5.4 Governance Summary | Checklist (8 done, 7 pending), monitoring schedule (incl. EU AI Act Art. 43/51) |
 
 ### Visualizations (6 total, saved to `figures/shap/`)
 
@@ -313,8 +313,8 @@
 - [x] SR 11-7 model documentation (purpose, inputs, outputs, assumptions, limitations)
 - [x] Fair lending feature review (5 features assessed, risk levels assigned)
 - [x] Right-to-explanation capability demonstrated (SHAP waterfall + plain English)
-- [x] Audit trail requirements specified (7-year retention, per-transaction SHAP logging)
-- [x] Model governance checklist (8/13 items complete, 5 pending for production)
+- [x] Audit trail requirements specified (7-year retention GDPR/US; 10-year for FINMA/nDSG scope, per-transaction SHAP logging)
+- [x] Model governance checklist (8/15 items complete, 7 pending for production)
 - [x] Monitoring schedule (daily/weekly/monthly/quarterly/annual cadence)
 
 ### Next Steps
@@ -324,7 +324,7 @@
 
 ## 05_streamlit_dashboard.ipynb
 
-**Date:** 2026-02-09 (updated 2026-02-10)
+**Date:** 2026-02-09 (updated 2026-03-21)
 **Status:** ✅ Completed (18 cells) + deployed to Streamlit Cloud
 **Location:** `notebooks/dashboard/05_streamlit_dashboard.ipynb`
 **Objective:** Build a professional, interactive dashboard for fraud detection analytics, model explainability, and regulatory compliance -- targeting a Data Scientist portfolio for banking roles.
@@ -397,12 +397,12 @@
 
 **Tab 5 -- Regulatory Compliance:**
 - HTML table of contents with anchor links
-- SR 11-7 checklist (8 completed, 4 pending)
+- SR 11-7 checklist (8 completed, 6 pending)
 - Fair lending review (5 features assessed)
 - Model governance framework (identification, risk tier, monitoring schedule)
 - Right-to-explanation and dispute resolution workflow
 - Data lineage and audit trail documentation
-- Swiss/EU regulatory alignment (FINMA Circular 2017/1, nDSG Art. 21, EU AI Act)
+- Swiss/EU regulatory alignment (FINMA Circular 2023/1, nDSG Art. 21, EU AI Act Art. 13/14/43/51)
 
 ### Interactive Controls
 

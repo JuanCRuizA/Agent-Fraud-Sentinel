@@ -247,7 +247,7 @@ with st.sidebar:
             "- **Model:** LightGBM with Bayesian optimization\n"
             "- **Cost structure:** $227 FN / $10 FP (ratio 22.7 : 1)\n"
             "- **Explainability:** SHAP TreeExplainer\n"
-            "- **Compliance:** Aligned with Federal Reserve SR 11-7"
+            "- **Compliance:** SR 11-7 / OCC 2011-12 (US); FINMA Circular 2023/1, nDSG, EU AI Act (Swiss/EU)"
         )
 
 
@@ -1007,6 +1007,8 @@ with tab5:
         "Champion/challenger framework",
         "Ongoing monitoring dashboard (drift detection)",
         "Quarterly model revalidation schedule",
+        "EU AI Act Art. 43 conformity assessment (required before production deployment)",
+        "EU AI Act Art. 51 registration in the EU database for high-risk AI",
     ]
 
     chk1, chk2 = st.columns(2)
@@ -1100,7 +1102,7 @@ with tab5:
             {"Frequency": "Quarterly",
              "Activity": "Full revalidation, threshold recalibration"},
             {"Frequency": "Annual",
-             "Activity": "Comprehensive SR 11-7 review"},
+             "Activity": "Comprehensive SR 11-7 / OCC 2011-12 review; FINMA Circular 2023/1 governance attestation"},
         ])
         st.dataframe(sched, use_container_width=True, hide_index=True)
 
@@ -1129,6 +1131,13 @@ with tab5:
         "Customers whose transactions are blocked or flagged may request an "
         "explanation. SHAP values provide a complete, auditable explanation "
         "at the individual transaction level.\n\n"
+        "**Applicable Frameworks:**\n\n"
+        "- **GDPR Art. 22** -- EU: right to explanation for automated decisions\n"
+        "- **nDSG Art. 21** -- Switzerland: equivalent right under Swiss revDSG\n"
+        "- **EU AI Act Art. 13** -- Transparency: high-risk AI must allow users "
+        "to interpret outputs\n"
+        "- **EU AI Act Art. 14** -- Human oversight: intervention and override "
+        "must be available at any time\n\n"
         "**For any transaction, the system can generate:**\n\n"
         "1. **Feature-level attribution** -- which factors contributed to "
         "the decision\n"
@@ -1136,6 +1145,13 @@ with tab5:
         "the score\n"
         "3. **Comparison to baseline** -- score relative to average fraud "
         "probability\n\n"
+        "**Human Oversight (EU AI Act Art. 14):**\n\n"
+        "The multi-threshold architecture directly implements Art. 14 requirements:\n"
+        "- Manual review tier (0.41-0.90): every decision reviewed by a human "
+        "analyst before action is taken\n"
+        "- Auto-block tier (>= 0.90): analyst can override by escalating to "
+        "a senior fraud investigator\n"
+        "- Override actions are logged in the audit trail\n\n"
         "**Dispute Resolution Workflow:**\n\n"
         "1. Customer contacts bank about a blocked transaction\n"
         "2. Analyst retrieves SHAP explanation from audit log\n"
@@ -1165,7 +1181,8 @@ with tab5:
         "6. Explainability: SHAP TreeExplainer for all predictions\n\n"
         "**Audit Requirements:**\n\n"
         "- SHAP values stored at scoring time\n"
-        "- Retention: minimum 7 years (regulatory requirement)\n"
+        "- Retention: minimum 7 years (GDPR / US regulatory standard); "
+        "10 years for FINMA/nDSG scope\n"
         "- Log fields: transaction_id, fraud_score, threshold, decision, "
         "SHAP values, model_version, timestamp"
     )
@@ -1189,10 +1206,10 @@ with tab5:
     reg_data = pd.DataFrame([
         {
             "U.S. Requirement": "SR 11-7 Model Risk Management",
-            "Swiss/EU Equivalent": "FINMA Circular 2017/1 (Operational Risks)",
+            "Swiss/EU Equivalent": "FINMA Circular 2023/1 (Operational Risks)",
             "SAFE Status": "Aligned",
             "Notes": (
-                "FINMA Circular 2017/1 requires banks to identify, measure, "
+                "FINMA Circular 2023/1 requires banks to identify, measure, "
                 "and control operational risks, including model risk. "
                 "SAFE's documentation, validation, and monitoring framework "
                 "satisfies both SR 11-7 and FINMA requirements."
@@ -1207,7 +1224,7 @@ with tab5:
                 "effective Sep 2023) mirrors GDPR Article 22: data subjects "
                 "can request human review of automated decisions with legal "
                 "effects. SAFE's SHAP-based right-to-explanation and manual "
-                "review tier (0.42-0.90) provide this mechanism."
+                "review tier (0.41-0.90) provide this mechanism."
             ),
         },
         {
@@ -1252,7 +1269,7 @@ with tab5:
     st.markdown("**Key Takeaways for Swiss Deployment:**")
     st.markdown(
         "1. **FINMA readiness:** SAFE's model governance framework "
-        "(Section 3) maps directly to FINMA Circular 2017/1 requirements "
+        "(Section 3) maps directly to FINMA Circular 2023/1 requirements "
         "for operational risk management in AI/ML models.\n"
         "2. **nDSG compliance:** The right-to-explanation capability "
         "(Section 4) and human-in-the-loop review tier satisfy Swiss data "

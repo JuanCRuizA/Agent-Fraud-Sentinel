@@ -24,6 +24,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - [DECISION-015] LightGBM as Third Model for Gradient Boosting Comparison
 - [DECISION-016] Horizontal st.tabs() Navigation for 5-Tab Dashboard
 - [DECISION-017] SHAP-Aligned Dynamic Narratives for Case Studies
+- [DECISION-018] Expand Regulatory Compliance to Full Swiss/EU Framework Set
 
 ### Pending Review
 - None
@@ -188,7 +189,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 **Consequences:**
 - Model evaluation uses cost-weighted metrics alongside standard AUC/F1
 - Threshold tuning optimizes for minimum total cost, not just classification accuracy
-- Test set total cost at optimal threshold: $730,482 (LightGBM, threshold 0.420)
+- Test set total cost at optimal threshold: $730,482 (LightGBM, threshold 0.410)
 - No-model baseline cost: $922,528 (all fraud undetected)
 - Savings vs no-model: $192,046 (20.8% reduction)
 - Stakeholder presentations frame model value in dollar terms
@@ -225,7 +226,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 **Date:** 2026-02-08 (updated 2026-03-02)
 **Status:** ✅ Implemented
 **Context:** Unconstrained cost optimization found threshold 0.720 with lowest total cost ($326K), but this only catches 17.1% of fraud (788 of 4,611 frauds). Real banks prioritize fraud detection over pure cost minimization.
-**Decision:** Implement constrained optimization requiring minimum 75% recall, resulting in threshold 0.420.
+**Decision:** Implement constrained optimization requiring minimum 75% recall, resulting in threshold 0.410.
 **Rationale:**
 - **Business reality**: Banks cannot tolerate catching only 14% of fraud, even if it minimizes immediate operational cost
 - **Regulatory compliance**: Financial institutions face penalties for inadequate fraud prevention
@@ -237,7 +238,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 2. **Higher recall targets (85-90%)**: Would require threshold ~0.25-0.30, causing FP explosion (100K+ false alarms)
 3. **Fixed threshold (0.5)**: Arbitrary choice, doesn't account for business costs (60.9% recall, moderate cost)
 **Consequences:**
-- **Threshold shifts**: From 0.720 (unconstrained) to 0.420 (constrained 75%)
+- **Threshold shifts**: From 0.720 (unconstrained) to 0.410 (constrained 75%)
 - **Recall improvement**: 17.1% → 76.6% (catches 2,743 additional frauds on validation set)
 - **Cost increase**: $326K → $578K (77.2% increase, or +$252K)
 - **Cost per additional fraud caught**: $91.87 (vs $75 median fraud amount -- slightly negative ROI on cost alone)
@@ -253,8 +254,8 @@ Document key technical decisions, rationale, and alternatives considered during 
 **Context:** Single threshold (0.420) achieves 75% recall but generates 51,524 manual reviews on validation set (46.6% of all transactions). This is operationally expensive and treats all flagged transactions equally, ignoring confidence levels.
 **Decision:** Implement three-tier strategy:
 - **Auto-block (score ≥ 0.90)**: Instant fraud block, $5 cost (automated processing)
-- **Manual review (0.420 ≤ score < 0.90)**: Human analyst review, $10 cost
-- **Auto-approve (score < 0.420)**: No review, $0 cost
+- **Manual review (0.410 ≤ score < 0.90)**: Human analyst review, $10 cost
+- **Auto-approve (score < 0.410)**: No review, $0 cost
 **Rationale:**
 - **Confidence-based triage**: High-confidence fraud (≥0.90) doesn't need human review
 - **Operational efficiency**: Reduces per-transaction cost for obvious fraud cases ($5 vs $10)
@@ -262,7 +263,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - **Faster fraud blocking**: Auto-block enables instant rejection for score ≥0.90 (no analyst queue)
 - **Realistic banking practice**: Real fraud systems use tiered decision rules, not binary threshold
 **Alternatives Considered:**
-- Single threshold (0.420): 76% recall but all flagged txns require manual review
+- Single threshold (0.410): 76% recall but all flagged txns require manual review
 - Four-tier strategy: Adding "auto-approve-with-monitoring" tier (0.30-0.42) adds complexity without clear benefit
 - Adaptive thresholds: Dynamic adjustment based on fraud rate trends (future enhancement)
 **Consequences:**
@@ -298,7 +299,7 @@ Document key technical decisions, rationale, and alternatives considered during 
 - 6 publication-ready figures saved to `figures/shap/`
 - Base value (expected model output) = 0.0178, meaning the model starts at ~1.8% fraud probability before seeing any features
 - Each feature pushes the score up or down from this baseline, enabling clear "waterfall" explanations
-- SHAP values should be stored at scoring time in production for audit trail (7-year retention)
+- SHAP values should be stored at scoring time in production for audit trail (7-year retention per GDPR/US; 10-year for FINMA/nDSG scope)
 **Related:** `notebooks/modeling/04_shap_explainability.ipynb` (Sections 2-3)
 
 ---
@@ -476,5 +477,31 @@ Document key technical decisions, rationale, and alternatives considered during 
 - Driver bullet points include SHAP values and are ordered by absolute magnitude
 - CSS added to hide Streamlit anchor link icons globally for professional appearance
 **Related:** `notebooks/dashboard/dashboard_app.py` (Tab 3), ISSUE-016, DECISION-011
+
+---
+
+### [DECISION-018] Expand Regulatory Compliance to Full Swiss/EU Framework Set
+**Date:** 2026-03-21
+**Status:** ✅ Implemented
+**Context:** Notebook 04 Section 5 and dashboard Tab 5 initially cited SR 11-7, GDPR Art. 22, ECOA/Fair Lending, and mentioned FINMA/nDSG/EU AI Act only in summary tables. A gap analysis found that OCC 2011-12, FINMA Circular 2023/1, nDSG Art. 21, EU AI Act Art. 13 and Art. 14 were either absent or only superficially referenced -- insufficient for a regulatory review submission.
+**Decision:** Explicitly integrate all applicable frameworks into each compliance subsection:
+- **5.1 documentation**: add OCC 2011-12 (independent model validation requirement) and FINMA 2023/1 (senior management accountability; CRO sign-off for material models)
+- **5.3 right-to-explanation**: add nDSG Art. 21 alongside GDPR Art. 22; add EU AI Act Art. 13 (transparency) and Art. 14 (human oversight); add paragraph linking the manual-review tier directly to Art. 14 compliance; clarify retention as 7 yr (GDPR/US) vs 10 yr (FINMA/nDSG)
+- **5.4 governance checklist**: add EU AI Act Art. 43 conformity assessment and Art. 51 EU database registration as pending items; update Annual monitoring row to include OCC 2011-12 and FINMA 2023/1 governance attestation
+- **Dashboard Tab 5**: mirror all nb04 changes; fix FINMA Circular 2017/1 -> 2023/1 (ISSUE-018)
+**Rationale:**
+- FINMA Circular 2023/1 is the operative circular for operational risk and model governance in Swiss banks; 2017/1 was incorrect
+- nDSG Art. 21 is the Swiss equivalent of GDPR Art. 22 -- omitting it creates a gap for Swiss deployments
+- EU AI Act Art. 14 (human oversight) is directly satisfied by the manual-review tier; making this link explicit is required for a high-risk AI conformity claim
+- EU AI Act Art. 43/51 are mandatory pre-deployment steps for high-risk AI systems and must appear in the governance checklist
+- OCC 2011-12 was listed in the intro as an applicable framework but never referenced in any subsection
+**Alternatives Considered:**
+- Reference frameworks only in intro/summary tables: Insufficient for regulatory review; each section must cite the specific article it satisfies
+**Consequences:**
+- nb04 cells 29, 30, 34, 36 updated; pending checklist grows from 5 to 7 items
+- `dashboard_app.py` and `05_streamlit_dashboard.ipynb` updated (7 changes each); pending checklist grows from 4 to 6 items
+- Retention requirement clarified: Swiss/FINMA/nDSG scope requires 10 years, not 7
+- SHAP audit trail logging note in DECISION-010 should note the 10-year requirement for Swiss deployments
+**Related:** `notebooks/modeling/04_shap_explainability.ipynb` (Section 5), `notebooks/dashboard/dashboard_app.py` (Tab 5), DECISION-010, ISSUE-018
 
 ---
