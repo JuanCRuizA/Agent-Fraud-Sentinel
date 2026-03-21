@@ -430,19 +430,19 @@ with tab2:
             "Stage": "3",
             "Model": "LightGBM",
             "Optimization": "Bayesian (Optuna)",
-            "Test Recall": "73.8%",
+            "Test Recall": "72.9%",
             "ROC-AUC": "0.7198",
             "PR-AUC": "0.1125",
-            "Total Cost": "$730,482",
+            "Total Cost": "$729,596",
             "Selected": "WINNER",
         },
     ])
     st.dataframe(journey_df, use_container_width=True, hide_index=True)
     st.caption(
-        "All models evaluated at threshold = 0.420 on 118,108 test transactions "
+        "All models evaluated at threshold = 0.410 on 118,108 test transactions "
         "(chronological split, no data leakage). "
         "Note: Logistic Regression costs more than No Model due to high false-positive volume. "
-        "LightGBM wins Stage 3: $9,310 lower cost than XGBoost and higher AUC. "
+        "LightGBM wins Stage 3: $10,196 lower cost than XGBoost and higher AUC. "
         "Cost minimisation is the primary selection criterion."
     )
 
@@ -731,7 +731,7 @@ with tab3:
                 "patterns (SHAP -0.18), and zero recent transaction velocity "
                 "(SHAP -0.08) collectively offset the amount signal, bringing "
                 "the final score to 0.3648 -- below the manual review "
-                "threshold of 0.42. This case demonstrates the model's "
+                "threshold of 0.41. This case demonstrates the model's "
                 "ability to balance competing signals: while $125.00 triggered "
                 "some fraud-associated patterns, the overall behavioral "
                 "context correctly indicated legitimate activity."
@@ -950,8 +950,8 @@ with tab4:
         from matplotlib.patches import Patch
         bar_patches = [
             Patch(facecolor='#c62828', label='Auto-Block (score >= 0.90)'),
-            Patch(facecolor='#e65100', label='Manual Review (0.42 - 0.90)'),
-            Patch(facecolor='#1565C0', label='Approved (score < 0.42)'),
+            Patch(facecolor='#e65100', label='Manual Review (0.41 - 0.90)'),
+            Patch(facecolor='#1565C0', label='Approved (score < 0.41)'),
         ]
         line_handles, line_labels = ax.get_legend_handles_labels()
         ax.legend(handles=bar_patches + line_handles, fontsize=9)
