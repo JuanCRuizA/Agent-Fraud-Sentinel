@@ -11,18 +11,18 @@ An end-to-end fraud detection system built on the **IEEE-CIS dataset** (590,540 
 | Metric | Value |
 |--------|-------|
 | Model | LightGBM with Bayesian optimization (Optuna, 30 trials) |
-| Recall | 73.8% (catches 3 out of 4 frauds) |
+| Recall | 72.9% (catches 3 out of 4 frauds) |
 | PR-AUC | 0.1125 (37.0% improvement over Logistic Regression baseline) |
 | Cost Ratio | FN=$227 (full economic cost) vs FP=$10 (manual review) = 22.7:1 |
-| Total Cost | $730,482 on test set ($192K saved vs no model) |
+| Total Cost | $729,596 on test set ($192,932 saved vs no model) |
 
 ### Production Strategy (Multi-Threshold)
 
 | Tier | Threshold | Action |
 |------|-----------|--------|
 | Auto-block | Score >= 0.90 | Instant fraud block (automated) |
-| Manual review | 0.42 <= Score < 0.90 | Routed to human analyst |
-| Auto-approve | Score < 0.42 | No action needed |
+| Manual review | 0.41 <= Score < 0.90 | Routed to human analyst |
+| Auto-approve | Score < 0.41 | No action needed |
 
 ---
 
@@ -33,7 +33,7 @@ An end-to-end fraud detection system built on the **IEEE-CIS dataset** (590,540 
 | 1. EDA | `01_eda_fraud_patterns.ipynb` | Fraud pattern analysis, class imbalance, temporal signals, cost assumptions |
 | 2. Feature Engineering | `02_feature_engineering.ipynb` | 7 leakage-free features across 4 tiers (velocity, behavioral, temporal, categorical) |
 | 3. Model Training | `03_model_training.ipynb` | Logistic Regression baseline, XGBoost and LightGBM with Bayesian optimization, cost-sensitive threshold optimization |
-| 4. Explainability | `04_shap_explainability.ipynb` | SHAP TreeExplainer, 5 case studies, SR 11-7 regulatory documentation |
+| 4. Explainability | `04_shap_explainability.ipynb` | SHAP TreeExplainer, 5 case studies, SR 11-7, OCC 2011-12, FINMA 2023/1, nDSG, EU AI Act regulatory documentation |
 | 5. Dashboard | `05_streamlit_dashboard.ipynb` | Interactive Streamlit app with 5 tabs (includes FINMA, nDSG, EU AI Act alignment), deployed to Streamlit Cloud |
 
 ---
@@ -107,9 +107,9 @@ agent-fraud-sentinel/
 │   ├── shap/                         # 11 SHAP explainability figures
 │   └── model_training/              # 5 model training figures (PR curve, cost, confusion matrices)
 ├── docs/                             # Technical documentation
-│   ├── technical-decisions.md        # 17 architectural decisions with rationale
+│   ├── technical-decisions.md        # 18 architectural decisions with rationale
 │   ├── notebooks-progress.md         # Development progress per notebook
-│   ├── issues-solutions.md           # 16 issues documented with root cause analysis
+│   ├── issues-solutions.md           # 18 issues documented with root cause analysis
 │   └── deployment-guide.md           # Deployment options and procedures
 ├── LICENSE                           # MIT License
 └── requirements.txt                  # Full environment dependencies
@@ -134,9 +134,9 @@ agent-fraud-sentinel/
 
 Detailed technical documentation is available in the [`docs/`](docs/) directory:
 
-- [**technical-decisions.md**](docs/technical-decisions.md) -- 17 decisions with context, rationale, and alternatives
+- [**technical-decisions.md**](docs/technical-decisions.md) -- 18 decisions with context, rationale, and alternatives
 - [**notebooks-progress.md**](docs/notebooks-progress.md) -- Cell-by-cell progress for all 5 notebooks
-- [**issues-solutions.md**](docs/issues-solutions.md) -- 16 issues with root cause analysis and prevention
+- [**issues-solutions.md**](docs/issues-solutions.md) -- 18 issues with root cause analysis and prevention
 - [**deployment-guide.md**](docs/deployment-guide.md) -- Streamlit Cloud, Docker, and enterprise deployment options
 
 ---
