@@ -980,7 +980,7 @@ with tab5:
     st.markdown("""
 <div class="toc-box">
 <strong>Table of Contents</strong><br><br>
-&nbsp;&nbsp;1. <a href="#sr-11-7-checklist">SR 11-7 Model Documentation Checklist</a><br>
+&nbsp;&nbsp;1. <a href="#sr-11-7-checklist">Production Readiness Checklist</a><br>
 &nbsp;&nbsp;2. <a href="#fair-lending-review">Fair Lending Considerations</a><br>
 &nbsp;&nbsp;3. <a href="#model-governance-framework">Model Governance Framework</a><br>
 &nbsp;&nbsp;4. <a href="#right-to-explanation">Right-to-Explanation Capabilities</a><br>
@@ -990,7 +990,7 @@ with tab5:
 """, unsafe_allow_html=True)
 
     # ── Section 1: SR 11-7 ───────────────────────────────────────────
-    st.subheader("1. SR 11-7 Model Documentation Checklist", anchor="sr-11-7-checklist")
+    st.subheader("1. Production Readiness Checklist", anchor="sr-11-7-checklist")
 
     done_items = [
         "Model documentation (purpose, inputs, outputs, assumptions)",
