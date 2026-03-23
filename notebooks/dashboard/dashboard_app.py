@@ -592,26 +592,27 @@ with tab3:
             "score": 0.9094, "actual": "FRAUD", "decision": "AUTO-BLOCK",
             "waterfall_file": "shap_waterfall_case1.png",
             "features": {
-                "Transaction Amount": "$17.52",
-                "Time of Day": "6:00 AM",
-                "Transactions (1 hour)": "1",
-                "Transactions (24 hours)": "9",
-                "Weekend": "Yes",
-                "Spending Anomaly": "-0.39 std devs",
+                "Transaction Amount": "$300.00",
+                "Time of Day": "9:00 AM",
+                "Transactions (1 hour)": "0",
+                "Transactions (24 hours)": "0",
+                "Weekend": "No",
+                "Spending Anomaly": "+1.18 std devs",
                 "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "This transaction was correctly identified as fraud. Multiple "
-                "strong indicators were present: a small amount typical of "
-                "card-testing behaviour ($17.52, SHAP +1.60), early-morning "
-                "timing (6:00 AM, SHAP +0.97), and a spending anomaly score "
-                "below the customer's normal pattern (SHAP +0.17). The model "
-                "automatically blocked this transaction, preventing the loss."
+                "This transaction was correctly identified as fraud. The "
+                "strongest indicator was the transaction amount ($300.00, "
+                "SHAP +1.71), which significantly exceeds typical spending "
+                "patterns. Morning timing (9:00 AM, SHAP +0.88) and an "
+                "elevated spending anomaly score (SHAP +0.17) reinforced the "
+                "fraud signal. The model automatically blocked this "
+                "transaction, preventing the loss."
             ),
             "drivers_title": "Key Risk Drivers",
             "drivers": [
-                "Transaction Amount (+1.60)",
-                "Time of Day (+0.97)",
+                "Transaction Amount (+1.71)",
+                "Time of Day (+0.88)",
                 "Spending Anomaly Score (+0.17)",
             ],
         },
@@ -624,54 +625,55 @@ with tab3:
                 "Transactions (1 hour)": "1",
                 "Transactions (24 hours)": "3",
                 "Weekend": "No",
-                "Spending Anomaly": "+0.54 std devs",
+                "Spending Anomaly": "+0.55 std devs",
                 "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "This fraud was detected primarily through early-morning "
-                "timing (4 AM, SHAP +0.86). Transaction velocity in the last "
-                "hour (+0.36) and above-average spending deviation (+0.24) "
-                "reinforced the fraud signal. Despite these indicators, the "
-                "transaction amount of $59.64 partially attenuated the score "
-                "(-0.24), resulting in a manual review decision rather than "
-                "auto-block."
+                "This fraud was detected through multiple converging signals. "
+                "The transaction amount ($59.64, SHAP +0.37) was the strongest "
+                "individual driver, followed closely by an elevated spending "
+                "anomaly (SHAP +0.36). High transaction velocity -- 1 in the "
+                "last hour (SHAP +0.30) and 3 in the last 24 hours (SHAP "
+                "+0.30) -- and early-morning timing (4:00 AM, SHAP +0.26) "
+                "combined to push the score to 0.7332, triggering a manual "
+                "review."
             ),
             "drivers_title": "Key Risk Drivers",
             "drivers": [
-                "Time of Day (+0.86)",
-                "Transaction Velocity 1 hour (+0.36)",
-                "Spending Anomaly Score (+0.24)",
+                "Transaction Amount (+0.37)",
+                "Spending Anomaly Score (+0.36)",
+                "Transaction Velocity 1 hour (+0.30)",
             ],
         },
         "Case 3: False Negative -- Missed Fraud": {
             "score": 0.0853, "actual": "FRAUD", "decision": "AUTO-APPROVE",
             "waterfall_file": "shap_waterfall_case3.png",
             "features": {
-                "Transaction Amount": "$57.95",
-                "Time of Day": "Business hours",
+                "Transaction Amount": "$30.95",
+                "Time of Day": "1:00 PM",
                 "Transactions (1 hour)": "0",
                 "Transactions (24 hours)": "0",
                 "Weekend": "No",
-                "Spending Anomaly": "-1.50 std devs",
-                "First Transaction": "Yes (new client)",
+                "Spending Anomaly": "-1.04 std devs",
+                "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "The model failed to detect this fraud because the complete "
-                "absence of recent transaction activity (0 in 24 hours, 0 in "
-                "1 hour) was interpreted as low-risk behavior (SHAP -1.91), "
-                "consistent with patterns the model learned from legitimate "
-                "low-frequency customers, and a spending pattern below the "
-                "customer's baseline (SHAP -0.58) further suppressed the "
-                "fraud score. This represents a model limitation: fraud "
-                "transactions that lack velocity signals and show "
-                "below-baseline spending fall outside the model's learned "
-                "fraud patterns."
+                "The model failed to detect this fraud because every feature "
+                "resembled a legitimate purchase. The transaction amount "
+                "($30.95, SHAP -1.14) fell squarely within the range the "
+                "model associates with normal spending. Midday timing "
+                "(1:00 PM, SHAP -0.41) and a below-average spending anomaly "
+                "(SHAP -0.36) further suppressed the score. Zero velocity in "
+                "both windows added additional suppression. This represents a "
+                "model limitation: fraud with no velocity signal, an "
+                "unremarkable amount, and below-baseline spending is "
+                "indistinguishable from legitimate low-frequency behaviour."
             ),
             "drivers_title": "Key Factors in Missed Detection",
             "drivers": [
-                "Zero transaction velocity 24h (SHAP -1.91) -- absence interpreted as legitimate",
-                "Below-baseline spending anomaly (SHAP -0.58) -- reinforced legitimacy signal",
-                "Zero transaction velocity 1h (SHAP -0.09) -- minor, same direction",
+                "Transaction Amount $30.95 (SHAP -1.14) -- within normal purchase range",
+                "Time of Day 1:00 PM (SHAP -0.41) -- business hours reduce risk signal",
+                "Below-baseline spending anomaly (SHAP -0.36) -- reinforced legitimacy signal",
             ],
             "improvement": (
                 "Engineer composite features that cross-reference "
@@ -685,62 +687,63 @@ with tab3:
             "score": 0.9342, "actual": "LEGITIMATE", "decision": "AUTO-BLOCK",
             "waterfall_file": "shap_waterfall_case4.png",
             "features": {
-                "Transaction Amount": "$15.00",
+                "Transaction Amount": "$20.95",
                 "Time of Day": "9:00 AM",
-                "Transactions (1 hour)": "1",
-                "Transactions (24 hours)": "2",
+                "Transactions (1 hour)": "5",
+                "Transactions (24 hours)": "5",
                 "Weekend": "Yes",
-                "Spending Anomaly": "-0.26 std devs",
+                "Spending Anomaly": "-0.61 std devs",
                 "First Transaction": "No (returning client)",
             },
             "explanation": (
                 "This legitimate transaction was incorrectly blocked (False "
-                "Positive). The small transaction amount of $15.00 was the "
-                "dominant factor (SHAP +1.24), triggering patterns the model "
-                "associates with card-testing behavior. A moderate transaction "
-                "velocity (+0.41, +0.32) further reinforced the fraud signal. "
-                "The combination of multiple moderate-to-strong positive SHAP "
-                "values across nearly all features produced a high fraud score "
-                "(0.9342), leaving the model with no offsetting signals to "
-                "recognize this as legitimate. This resulted in an unnecessary "
+                "Positive). Morning timing (9:00 AM, SHAP +1.04) was the "
+                "dominant driver, triggering patterns the model strongly "
+                "associates with fraud. The transaction amount ($20.95, "
+                "SHAP +0.68) and high transaction velocity -- 5 in the last "
+                "hour (SHAP +0.51) and 5 in the last 24 hours (SHAP +0.33) "
+                "-- reinforced the fraud signal. With all features pushing in "
+                "the same direction and no offsetting signals, the model "
+                "assigned a score of 0.9342, resulting in an unnecessary "
                 "block and a negative customer experience."
             ),
             "drivers_title": "Key Factors in False Alert",
             "drivers": [
-                "Transaction Amount (+1.24) -- dominant false signal",
-                "Time of Day (+0.54)",
-                "Transaction Velocity 1 hour (+0.41)",
+                "Time of Day 9:00 AM (+1.04) -- dominant false signal",
+                "Transaction Amount $20.95 (+0.68)",
+                "Transaction Velocity 1 hour (+0.51)",
             ],
         },
         "Case 5: Borderline -- Near Review Threshold": {
             "score": 0.3648, "actual": "LEGITIMATE", "decision": "AUTO-APPROVE",
             "waterfall_file": "shap_waterfall_case5.png",
             "features": {
-                "Transaction Amount": "$125.00",
-                "Time of Day": "Afternoon",
-                "Transactions (1 hour)": "0",
-                "Transactions (24 hours)": "0",
+                "Transaction Amount": "$36.00",
+                "Time of Day": "8:00 PM",
+                "Transactions (1 hour)": "3",
+                "Transactions (24 hours)": "4",
                 "Weekend": "No",
-                "Spending Anomaly": "Normal",
+                "Spending Anomaly": "-0.82 std devs",
                 "First Transaction": "No (returning client)",
             },
             "explanation": (
-                "This legitimate transaction was correctly approved despite a "
-                "moderately elevated fraud signal from the transaction amount "
-                "(SHAP +0.61). Afternoon timing (SHAP -0.29), normal spending "
-                "patterns (SHAP -0.18), and zero recent transaction velocity "
-                "(SHAP -0.08) collectively offset the amount signal, bringing "
-                "the final score to 0.3648 -- below the manual review "
-                "threshold of 0.41. This case demonstrates the model's "
-                "ability to balance competing signals: while $125.00 triggered "
-                "some fraud-associated patterns, the overall behavioral "
-                "context correctly indicated legitimate activity."
+                "This legitimate transaction was correctly approved despite "
+                "elevated transaction velocity -- 3 in the last hour "
+                "(SHAP +0.55) and 4 in the last 24 hours (SHAP +0.62) -- "
+                "which pushed toward a fraud signal. However, the low "
+                "transaction amount ($36.00, SHAP -0.75) was the dominant "
+                "offsetting factor, strongly indicating routine spending. A "
+                "below-baseline spending anomaly (SHAP -0.25) further "
+                "suppressed the score. The balance of these competing signals "
+                "produced a final score of 0.3648 -- below the manual review "
+                "threshold of 0.41 -- correctly approving a legitimate "
+                "transaction."
             ),
             "drivers_title": "Key Factors in Correct Approval",
             "drivers": [
-                "Time of Day (-0.29) -- afternoon timing consistent with legitimate activity",
-                "Spending Anomaly Score (-0.18) -- normal spending pattern",
-                "Transaction Velocity 1 hour (-0.08) -- no unusual activity",
+                "Transaction Amount $36.00 (SHAP -0.75) -- low amount signals routine spending",
+                "Spending Anomaly -0.82 (SHAP -0.25) -- below-baseline spending reinforces legitimacy",
+                "Weekend: No (SHAP -0.02) -- weekday reduces fraud risk",
             ],
         },
     }
